@@ -96,7 +96,7 @@ tasks:
     desc: Clean build, archive, and export
     cmds:
       - task: clean
-      - task: archive
+      - task: export
 
   lint:
     desc: Lint Swift code with SwiftLint
