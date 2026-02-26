@@ -10,9 +10,22 @@
 		APP00000000000000000001 /* GiantLogger.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GiantLogger.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EXC000000000000000000001 /* Exceptions for "GiantLogger" folder in "GiantLogger" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = TGT000000000000000000001 /* GiantLogger */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		SRC000000000000000000001 /* GiantLogger */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EXC000000000000000000001 /* Exceptions for "GiantLogger" folder in "GiantLogger" target */,
+			);
 			path = GiantLogger;
 			sourceTree = "<group>";
 		};
