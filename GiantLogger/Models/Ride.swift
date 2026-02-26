@@ -1,0 +1,99 @@
+import Foundation
+import SwiftData
+
+@Model
+final class Ride {
+    var id: UUID
+    var startDate: Date
+    var endDate: Date?
+
+    // Summary stats (computed on stop)
+    var totalDistance: Double = 0      // km
+    var duration: Int = 0             // seconds
+    var avgSpeed: Double = 0          // km/h
+    var maxSpeed: Double = 0          // km/h
+    var avgPower: Double = 0          // W
+    var maxPower: Double = 0          // W
+    var avgCadence: Double = 0        // RPM
+    var maxCadence: Double = 0        // RPM
+    var startBattery: Int = 0         // %
+    var endBattery: Int = 0           // %
+
+    @Relationship(deleteRule: .cascade, inverse: \RideSample.ride)
+    var samples: [RideSample] = []
+
+    init(startDate: Date = .now) {
+        self.id = UUID()
+        self.startDate = startDate
+    }
+
+    func computeSummary() {
+        guard !samples.isEmpty else { return }
+        let sorted = samples.sorted { $0.timestamp < $1.timestamp }
+
+        endDate = sorted.last?.timestamp
+        duration = Int((endDate ?? startDate).timeIntervalSince(startDate))
+        totalDistance = sorted.last?.distance ?? 0
+
+        let movingSamples = sorted.filter { $0.speed > 0.5 }
+        avgSpeed = movingSamples.isEmpty ? 0 : movingSamples.map(\.speed).reduce(0, +) / Double(movingSamples.count)
+        maxSpeed = sorted.map(\.speed).max() ?? 0
+
+        let powerSamples = sorted.filter { $0.watts > 0 }
+        avgPower = powerSamples.isEmpty ? 0 : powerSamples.map(\.watts).reduce(0, +) / Double(powerSamples.count)
+        maxPower = sorted.map(\.watts).max() ?? 0
+
+        let cadenceSamples = sorted.filter { $0.cadence > 0 }
+        avgCadence = cadenceSamples.isEmpty ? 0 : cadenceSamples.map(\.cadence).reduce(0, +) / Double(cadenceSamples.count)
+        maxCadence = sorted.map(\.cadence).max() ?? 0
+
+        startBattery = sorted.first?.batteryPercent ?? 0
+        endBattery = sorted.last?.batteryPercent ?? 0
+    }
+}
+
+@Model
+final class RideSample {
+    var timestamp: Date
+    var ride: Ride?
+
+    // Bike telemetry
+    var speed: Double = 0            // km/h
+    var cadence: Double = 0          // RPM
+    var torque: Double = 0           // Nm
+    var watts: Double = 0            // W
+    var batteryPercent: Int = 0      // 0-100
+    var distance: Double = 0         // km
+    var rideTime: Int = 0            // seconds
+    var range: Int = 0               // km
+    var errorCode: Int = 0
+
+    // GPS data (iOS-only bonus)
+    var latitude: Double = 0
+    var longitude: Double = 0
+    var altitude: Double = 0         // meters
+    var gpsSpeed: Double = 0         // m/s
+    var course: Double = 0           // degrees
+
+    init(timestamp: Date = .now) {
+        self.timestamp = timestamp
+    }
+
+    convenience init(rideData: RideData, latitude: Double = 0, longitude: Double = 0, altitude: Double = 0, gpsSpeed: Double = 0, course: Double = 0) {
+        self.init(timestamp: .now)
+        self.speed = rideData.speed
+        self.cadence = rideData.cadence
+        self.torque = rideData.torque
+        self.watts = rideData.watts
+        self.batteryPercent = rideData.batteryPercent
+        self.distance = rideData.distance
+        self.rideTime = rideData.rideTime
+        self.range = rideData.range
+        self.errorCode = rideData.errorCode
+        self.latitude = latitude
+        self.longitude = longitude
+        self.altitude = altitude
+        self.gpsSpeed = gpsSpeed
+        self.course = course
+    }
+}
