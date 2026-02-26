@@ -10,7 +10,7 @@
 	<string>automatic</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>com.hilli.GiantLogger</key>
+		<key>dk.hilli.GiantLogger</key>
 		<string>iOS Team Provisioning Profile: *</string>
 	</dict>
 	<key>destination</key>
