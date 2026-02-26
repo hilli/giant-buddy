@@ -4,7 +4,7 @@ version: "3"
 vars:
   PROJECT: GiantLogger.xcodeproj
   SCHEME: GiantLogger
-  BUNDLE_ID: com.hilli.GiantLogger
+  BUNDLE_ID: dk.hilli.GiantLogger
   DESTINATION: "generic/platform=iOS"
   ARCHIVE_PATH: build/GiantLogger.xcarchive
   EXPORT_PATH: build/export
@@ -56,6 +56,26 @@ tasks:
         CODE_SIGNING_REQUIRED=NO
         CODE_SIGNING_ALLOWED=NO
         -quiet
+
+  simulator:
+    desc: Build and run in iOS Simulator
+    vars:
+      SIM_DEST: '{{.SIM_DEST | default "platform=iOS Simulator,name=iPhone 16"}}'
+    cmds:
+      - >-
+        xcodebuild
+        -project {{.PROJECT}}
+        -scheme {{.SCHEME}}
+        -configuration Debug
+        -destination '{{.SIM_DEST}}'
+        -derivedDataPath build/DerivedData
+        -quiet
+      - >-
+        open -a Simulator
+      - >-
+        xcrun simctl install booted build/DerivedData/Build/Products/Debug-iphonesimulator/{{.SCHEME}}.app
+      - >-
+        xcrun simctl launch booted {{.BUNDLE_ID}}
 
   clean:
     desc: Clean build artifacts
