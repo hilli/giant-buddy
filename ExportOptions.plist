@@ -8,6 +8,11 @@
 	<string>28G3L5U25M</string>
 	<key>signingStyle</key>
 	<string>automatic</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.hilli.GiantLogger</key>
+		<string>iOS Team Provisioning Profile: *</string>
+	</dict>
 	<key>destination</key>
 	<string>export</string>
 	<key>stripSwiftSymbols</key>
