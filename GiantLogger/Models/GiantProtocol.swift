@@ -159,13 +159,13 @@ enum GiantProtocol {
     static func parseRidingData(_ plain: [UInt8]) -> RideData? {
         guard plain[0] == Command.readRidingData.rawValue else { return nil }
         return RideData(
-            speed: Double(bigEndianUInt16(plain, offset: 2)) / 10.0,
-            cadence: Double(bigEndianUInt16(plain, offset: 4)) / 10.0,
-            torque: Double(bigEndianUInt16(plain, offset: 6)) / 100.0,
-            watts: Double(bigEndianUInt16(plain, offset: 8)) / 10.0,
+            speed: Double(littleEndianUInt16(plain, offset: 2)) / 10.0,
+            cadence: Double(littleEndianUInt16(plain, offset: 6)) / 10.0,
+            torque: Double(littleEndianUInt16(plain, offset: 4)) / 10.0,
+            watts: Double(littleEndianUInt16(plain, offset: 8)) / 10.0,
             batteryPercent: Int(plain[10]),
-            distance: Double(bigEndianUInt16(plain, offset: 11)) / 10.0,
-            rideTime: Int(bigEndianUInt16(plain, offset: 13)),
+            distance: Double(littleEndianUInt16(plain, offset: 11)) / 10.0,
+            rideTime: Int(littleEndianUInt16(plain, offset: 13)),
             range: 0,
             errorCode: Int(plain[15])
         )
@@ -179,13 +179,13 @@ enum GiantProtocol {
         return FactoryData(
             frameNumber: frameNumber,
             rcType: Int(plain[13]),
-            rcHardwareVersion: bigEndianUInt16(plain, offset: 14)
+            rcHardwareVersion: littleEndianUInt16(plain, offset: 14)
         )
     }
 
     static func parseRemainingRange(_ plain: [UInt8]) -> Int? {
         guard plain[0] == Command.readRemainingRange.rawValue else { return nil }
-        return Int(bigEndianUInt16(plain, offset: 2))
+        return Int(littleEndianUInt16(plain, offset: 2))
     }
 
     static func parseBatteryData(_ plain: [UInt8]) -> BatteryData? {
@@ -193,14 +193,14 @@ enum GiantProtocol {
         return BatteryData(
             capacityPercent: Int(plain[2]),
             lifePercent: Int(plain[3]),
-            lastFullCapacityWh: Double(bigEndianUInt16(plain, offset: 4)) / 10.0
+            lastFullCapacityWh: Double(littleEndianUInt16(plain, offset: 4)) / 10.0
         )
     }
 
     static func parseDiagnosticSyncDrive(_ plain: [UInt8]) -> SyncDriveData? {
         guard plain[0] == Command.diagnosticSyncDrive.rawValue else { return nil }
         let fwVersion = "\(plain[3]).\(plain[4]).\(plain[5])"
-        let odometer = bigEndianUInt32(plain, offset: 6)
+        let odometer = littleEndianUInt32(plain, offset: 6)
         return SyncDriveData(
             duType: Int(plain[2]),
             firmwareVersion: fwVersion,
@@ -272,13 +272,13 @@ enum GiantProtocol {
         bytes.reduce(0, ^)
     }
 
-    private static func bigEndianUInt16(_ bytes: [UInt8], offset: Int) -> UInt16 {
-        UInt16(bytes[offset]) << 8 | UInt16(bytes[offset + 1])
+    private static func littleEndianUInt16(_ bytes: [UInt8], offset: Int) -> UInt16 {
+        UInt16(bytes[offset]) | UInt16(bytes[offset + 1]) << 8
     }
 
-    private static func bigEndianUInt32(_ bytes: [UInt8], offset: Int) -> UInt32 {
-        UInt32(bytes[offset]) << 24 | UInt32(bytes[offset + 1]) << 16 |
-        UInt32(bytes[offset + 2]) << 8 | UInt32(bytes[offset + 3])
+    private static func littleEndianUInt32(_ bytes: [UInt8], offset: Int) -> UInt32 {
+        UInt32(bytes[offset]) | UInt32(bytes[offset + 1]) << 8 |
+        UInt32(bytes[offset + 2]) << 16 | UInt32(bytes[offset + 3]) << 24
     }
 }
 
