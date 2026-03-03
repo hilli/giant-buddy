@@ -79,19 +79,44 @@ class GiantBikeService: ObservableObject {
     }
 
     func toggleLight() {
-        bikeManager?.write(GiantProtocol.triggerLightCommand())
+        let data = GiantProtocol.triggerLightCommand()
+        debugLog.log("GEV", "TRIGGER light → \(data.count)B")
+        sendTrigger(data)
     }
 
     func assistUp() {
-        bikeManager?.write(GiantProtocol.triggerAssistUpCommand())
+        let data = GiantProtocol.triggerAssistUpCommand()
+        debugLog.log("GEV", "TRIGGER assistUp → \(data.count)B")
+        sendTrigger(data)
     }
 
     func assistDown() {
-        bikeManager?.write(GiantProtocol.triggerAssistDownCommand())
+        let data = GiantProtocol.triggerAssistDownCommand()
+        debugLog.log("GEV", "TRIGGER assistDown → \(data.count)B")
+        sendTrigger(data)
     }
 
     func togglePower() {
-        bikeManager?.write(GiantProtocol.triggerPowerCommand())
+        let data = GiantProtocol.triggerPowerCommand()
+        debugLog.log("GEV", "TRIGGER power → \(data.count)B")
+        sendTrigger(data)
+    }
+
+    /// Send a trigger command: pause polling, write without BLE-level ACK
+    /// (matching Android's sendCommandWithoutResponse), then resume polling.
+    private func sendTrigger(_ data: Data) {
+        // Pause polling so the trigger isn't queued behind a polling write
+        pollingTask?.cancel()
+        pollingTask = nil
+
+        // Fire-and-forget write (Android uses WRITE_TYPE_NO_RESPONSE for triggers)
+        bikeManager?.writeWithoutResponse(data)
+
+        // Resume polling after a brief delay
+        Task {
+            try? await Task.sleep(for: .milliseconds(200))
+            startPolling()
+        }
     }
 
     // MARK: - Lifecycle

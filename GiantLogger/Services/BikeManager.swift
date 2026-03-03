@@ -103,6 +103,20 @@ class BikeManager: NSObject, ObservableObject {
         peripheral.writeValue(data, for: characteristic, type: .withResponse)
     }
 
+    /// Write without waiting for a BLE-level ACK (matches Android WRITE_TYPE_NO_RESPONSE).
+    /// Used for trigger commands (light, assist, power) that are fire-and-forget.
+    func writeWithoutResponse(_ data: Data) {
+        guard let peripheral = connectedPeripheral,
+              let characteristic = writeCharacteristic else {
+            logger.warning("Dropped TX packet: no connected peripheral or write characteristic")
+            debugLog.log("BLE", "WARN: Dropped TX packet (no-response write)")
+            return
+        }
+        logger.debug("TX (no-resp) \(data.count) bytes: \(data.hexString, privacy: .public)")
+        debugLog.log("BLE", "TX (no-resp) \(data.count)B: \(data.hexString)")
+        peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
+    }
+
     private func cleanup() {
         connectedPeripheral = nil
         writeCharacteristic = nil
