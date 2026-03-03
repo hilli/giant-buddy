@@ -9,6 +9,9 @@ struct SettingsView: View {
     @AppStorage("savedDeviceName") private var savedDeviceName = ""
     @AppStorage("savedDeviceID") private var savedDeviceID = ""
 
+    @State private var showingShareSheet = false
+    @State private var logSize = 0
+
     var body: some View {
         NavigationStack {
             Form {
@@ -68,6 +71,8 @@ struct SettingsView: View {
                     Text("When auto-connect is enabled, the app will automatically connect to your saved bike when it's in range.")
                 }
 
+                debugLogSection
+
                 Section {
                     HStack {
                         Text("Version")
@@ -88,6 +93,53 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .onAppear { refreshLogSize() }
+            .sheet(isPresented: $showingShareSheet) {
+                ShareSheet(items: [DebugLogger.shared.logFileURL])
+            }
         }
+    }
+
+    private var debugLogSection: some View {
+        Section {
+            HStack {
+                Text("Log Size")
+                Spacer()
+                Text(formattedLogSize)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            Button {
+                showingShareSheet = true
+            } label: {
+                HStack {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Export Debug Log")
+                }
+            }
+            .disabled(logSize == 0)
+
+            Button("Clear Log", role: .destructive) {
+                DebugLogger.shared.clearLog()
+                refreshLogSize()
+            }
+            .disabled(logSize == 0)
+        } header: {
+            Text("Debug Log")
+        } footer: {
+            Text("BLE/GEV protocol logs are written to a file on device. Export and share to debug connectivity issues.")
+        }
+    }
+
+    private func refreshLogSize() {
+        logSize = DebugLogger.shared.logFileSize
+    }
+
+    private var formattedLogSize: String {
+        if logSize == 0 { return "Empty" }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(logSize))
     }
 }

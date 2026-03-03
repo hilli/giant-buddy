@@ -1,43 +1,254 @@
 import SwiftUI
 import MapKit
+import WeatherKit
 
 struct DashboardView: View {
     @EnvironmentObject var bikeService: GiantBikeService
     @EnvironmentObject var bikeManager: BikeManager
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var rideRecorder: RideRecorder
+    @EnvironmentObject var weatherManager: WeatherManager
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    @State private var mapCameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
+
+    private var isLandscape: Bool {
+        verticalSizeClass == .compact
+    }
+
+    /// Build trail coordinates from current ride samples.
+    private var trailCoordinates: [CLLocationCoordinate2D] {
+        guard let samples = rideRecorder.currentRide?.samples else { return [] }
+        return samples
+            .sorted { $0.timestamp < $1.timestamp }
+            .filter { $0.latitude != 0 || $0.longitude != 0 }
+            .map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Connection status bar
-                    connectionStatusBar
+            if isLandscape {
+                landscapeDashboard
+                    .navigationTitle("Giant Logger")
+                    .navigationBarTitleDisplayMode(.inline)
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Connection status bar
+                        connectionStatusBar
 
-                    // Big speed display
-                    speedSection
+                        // Big speed display
+                        speedSection
 
-                    // Primary metrics grid
-                    primaryMetricsGrid
+                        // Primary metrics grid
+                        primaryMetricsGrid
 
-                    // Battery & range row
-                    batteryRangeRow
+                        // Battery & range row
+                        batteryRangeRow
 
-                    // Mini map
-                    miniMapSection
+                        // Weather
+                        weatherSection
 
-                    // Record button
+                        // Mini map
+                        miniMapSection
+
+                        // Record button
+                        recordButton
+
+                        // Bike controls
+                        if bikeService.isGevConnected {
+                            bikeControlsSection
+                        }
+                    }
+                    .padding()
+                }
+                .navigationTitle("Giant Logger")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .task(id: locationManager.currentLocation) {
+            if let location = locationManager.currentLocation {
+                await weatherManager.fetchWeather(for: location)
+            }
+        }
+        .onAppear {
+            if locationManager.currentLocation == nil {
+                locationManager.requestSingleLocation()
+            }
+        }
+    }
+
+    // MARK: - Landscape Layout
+
+    private var landscapeDashboard: some View {
+        VStack(spacing: 8) {
+            // Minimal status bar
+            compactStatusBar
+                .padding(.horizontal)
+
+            HStack(spacing: 16) {
+                // Left side: Speed + Record button
+                VStack(spacing: 12) {
+                    Spacer()
+                    landscapeSpeedSection
                     recordButton
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    // Bike controls
+                // Right side: Metrics, Map, Controls
+                VStack(spacing: 8) {
+                    compactMetricsRow
+                    compactBatteryInfo
+                    compactWeatherRow
+                    if locationManager.currentLocation != nil {
+                        compactMiniMap
+                    }
                     if bikeService.isGevConnected {
-                        bikeControlsSection
+                        compactBikeControls
                     }
                 }
-                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .navigationTitle("Giant Logger")
-            .navigationBarTitleDisplayMode(.inline)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private var compactStatusBar: some View {
+        HStack {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+            Spacer()
+            if rideRecorder.isRecording {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 6, height: 6)
+                    Text("REC • \(rideRecorder.sampleCount)")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    private var landscapeSpeedSection: some View {
+        VStack(spacing: 2) {
+            Text(String(format: "%.1f", bikeService.rideData.speed))
+                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text("km/h")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var compactMetricsRow: some View {
+        HStack(spacing: 8) {
+            CompactMetricCard(
+                value: String(format: "%.0f", bikeService.rideData.watts),
+                unit: "W",
+                icon: "bolt.fill",
+                color: .orange
+            )
+            CompactMetricCard(
+                value: String(format: "%.0f", bikeService.rideData.cadence),
+                unit: "rpm",
+                icon: "arrow.clockwise",
+                color: .blue
+            )
+            CompactMetricCard(
+                value: String(format: "%.1f", bikeService.rideData.torque),
+                unit: "Nm",
+                icon: "gearshape.fill",
+                color: .purple
+            )
+        }
+    }
+
+    private var compactBatteryInfo: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 4) {
+                compactBatteryIcon
+                Text("\(bikeService.rideData.batteryPercent)%")
+                    .font(.caption.bold())
+                    .monospacedDigit()
+            }
+            Divider().frame(height: 16)
+            HStack(spacing: 4) {
+                Image(systemName: "road.lanes")
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+                Text(String(format: "%.1f km", bikeService.rideData.distance))
+                    .font(.caption.bold())
+                    .monospacedDigit()
+            }
+            Divider().frame(height: 16)
+            HStack(spacing: 4) {
+                Image(systemName: "timer")
+                    .font(.caption2)
+                    .foregroundStyle(.cyan)
+                Text(formatDuration(bikeService.rideData.rideTime))
+                    .font(.caption.bold())
+                    .monospacedDigit()
+            }
+            Divider().frame(height: 16)
+            HStack(spacing: 4) {
+                Image(systemName: "fuelpump.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.mint)
+                Text("\(bikeService.rideData.range) km")
+                    .font(.caption.bold())
+                    .monospacedDigit()
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var compactBatteryIcon: some View {
+        let pct = bikeService.rideData.batteryPercent
+        let name = pct > 75 ? "battery.100" : pct > 50 ? "battery.75" : pct > 25 ? "battery.50" : "battery.25"
+        let color: Color = pct > 20 ? .green : pct > 10 ? .orange : .red
+        return Image(systemName: name)
+            .font(.caption)
+            .foregroundStyle(color)
+            .symbolRenderingMode(.hierarchical)
+    }
+
+    @ViewBuilder
+    private var compactMiniMap: some View {
+        Map(position: $mapCameraPosition) {
+            UserAnnotation()
+            if trailCoordinates.count >= 2 {
+                MapPolyline(coordinates: trailCoordinates)
+                    .stroke(.blue, lineWidth: 2)
+            }
+        }
+        .frame(maxHeight: 80)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .allowsHitTesting(false)
+    }
+
+    private var compactBikeControls: some View {
+        HStack(spacing: 8) {
+            CompactControlButton(icon: "lightbulb.fill") {
+                bikeService.toggleLight()
+            }
+            CompactControlButton(icon: "minus.circle.fill") {
+                bikeService.assistDown()
+            }
+            CompactControlButton(icon: "plus.circle.fill") {
+                bikeService.assistUp()
+            }
+            CompactControlButton(icon: "power") {
+                bikeService.togglePower()
+            }
         }
     }
 
@@ -160,8 +371,12 @@ struct DashboardView: View {
     @ViewBuilder
     private var miniMapSection: some View {
         if locationManager.currentLocation != nil {
-            Map {
+            Map(position: $mapCameraPosition) {
                 UserAnnotation()
+                if trailCoordinates.count >= 2 {
+                    MapPolyline(coordinates: trailCoordinates)
+                        .stroke(.blue, lineWidth: 3)
+                }
             }
             .frame(height: 150)
             .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -206,6 +421,82 @@ struct DashboardView: View {
                     bikeService.togglePower()
                 }
             }
+        }
+    }
+
+    // MARK: - Weather
+
+    @ViewBuilder
+    private var weatherSection: some View {
+        if let current = weatherManager.currentWeather {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Weather")
+                    .font(.headline)
+
+                HStack(spacing: 16) {
+                    // Current conditions
+                    HStack(spacing: 8) {
+                        Image(systemName: current.symbolName)
+                            .font(.title)
+                            .symbolRenderingMode(.multicolor)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(current.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
+                                .font(.title2.bold())
+                            Text(current.condition.description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Next 3 hours
+                    HStack(spacing: 12) {
+                        ForEach(weatherManager.hourlyForecast, id: \.date) { hour in
+                            VStack(spacing: 4) {
+                                Text(hour.date.formatted(.dateTime.hour()))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: hour.symbolName)
+                                    .symbolRenderingMode(.multicolor)
+                                    .font(.callout)
+                                Text(hour.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
+                                    .font(.caption.bold())
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var compactWeatherRow: some View {
+        if let current = weatherManager.currentWeather {
+            HStack(spacing: 8) {
+                Image(systemName: current.symbolName)
+                    .symbolRenderingMode(.multicolor)
+                    .font(.caption)
+                Text(current.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
+                    .font(.caption.bold())
+
+                Divider().frame(height: 16)
+
+                ForEach(weatherManager.hourlyForecast, id: \.date) { hour in
+                    HStack(spacing: 2) {
+                        Image(systemName: hour.symbolName)
+                            .symbolRenderingMode(.multicolor)
+                            .font(.caption2)
+                        Text(hour.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
+                            .font(.caption2)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         }
     }
 
@@ -295,6 +586,48 @@ struct ControlButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct CompactMetricCard: View {
+    let value: String
+    let unit: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundStyle(color)
+            Text(value)
+                .font(.callout.bold())
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text(unit)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 6)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct CompactControlButton: View {
+    let icon: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.callout)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
     }

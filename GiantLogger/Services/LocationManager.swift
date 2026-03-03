@@ -43,6 +43,14 @@ class LocationManager: NSObject, ObservableObject {
         manager.stopUpdatingLocation()
         isTracking = false
     }
+
+    /// Request a single location fix (e.g. for weather). Does not start continuous tracking.
+    func requestSingleLocation() {
+        if authorizationStatus == .notDetermined {
+            requestPermission()
+        }
+        manager.requestLocation()
+    }
 }
 
 // MARK: - CLLocationManagerDelegate
@@ -59,5 +67,9 @@ extension LocationManager: CLLocationManagerDelegate {
         Task { @MainActor in
             authorizationStatus = manager.authorizationStatus
         }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("LocationManager: \(error.localizedDescription)")
     }
 }

@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>method</key>
-	<string>debugging</string>
-	<key>teamID</key>
-	<string>28G3L5U25M</string>
+	<string>development</string>
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Development</string>
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>dk.hilli.GiantLogger</key>
-		<string>iOS Team Provisioning Profile: *</string>
+		<string>GiantLoggerProvisioningProfile</string>
 	</dict>
 	<key>destination</key>
 	<string>export</string>

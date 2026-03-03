@@ -11,7 +11,7 @@ class RideRecorder: ObservableObject {
     @Published var sampleCount = 0
 
     var recordingInterval: TimeInterval = 2.0
-    var autoRecord = true
+    var autoRecord = false
 
     private var bikeService: GiantBikeService?
     private var locationManager: LocationManager?
