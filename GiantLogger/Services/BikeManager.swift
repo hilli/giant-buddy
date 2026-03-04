@@ -38,6 +38,12 @@ class BikeManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        // Restore auto-connect from UserDefaults
+        if UserDefaults.standard.bool(forKey: "autoConnectEnabled"),
+           let savedID = UserDefaults.standard.string(forKey: "savedDeviceID"),
+           let uuid = UUID(uuidString: savedID) {
+            autoConnectIdentifier = uuid
+        }
         centralManager = CBCentralManager(delegate: self, queue: nil)
     }
 
@@ -168,6 +174,7 @@ extension BikeManager: CBCentralManagerDelegate {
             UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: "savedDeviceID")
             if autoConnectIdentifier != nil {
                 autoConnectIdentifier = peripheral.identifier
+                UserDefaults.standard.set(true, forKey: "autoConnectEnabled")
             }
             logger.debug("Saved device as \(savedName, privacy: .public)")
             peripheral.discoverServices([serviceUUID])

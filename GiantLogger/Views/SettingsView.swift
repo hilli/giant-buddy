@@ -51,6 +51,7 @@ struct SettingsView: View {
                             savedDeviceName = ""
                             savedDeviceID = ""
                             bikeManager.autoConnectIdentifier = nil
+                            UserDefaults.standard.set(false, forKey: "autoConnectEnabled")
                         }
                     }
 
@@ -59,8 +60,10 @@ struct SettingsView: View {
                         set: { enabled in
                             if enabled, let id = UUID(uuidString: savedDeviceID) {
                                 bikeManager.autoConnectIdentifier = id
+                                UserDefaults.standard.set(true, forKey: "autoConnectEnabled")
                             } else {
                                 bikeManager.autoConnectIdentifier = nil
+                                UserDefaults.standard.set(false, forKey: "autoConnectEnabled")
                             }
                         }
                     ))
