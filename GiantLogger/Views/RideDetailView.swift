@@ -31,6 +31,7 @@ struct RideDetailView: View {
                 // Charts
                 if sortedSamples.count > 1 {
                     speedChart
+                    elevationChart
                     powerChart
                     batteryChart
                 }
@@ -101,6 +102,7 @@ struct RideDetailView: View {
             StatCard(title: "Avg Power", value: String(format: "%.0f W", ride.avgPower), icon: "bolt.fill")
             StatCard(title: "Max Power", value: String(format: "%.0f W", ride.maxPower), icon: "bolt.circle.fill")
             StatCard(title: "Avg Cadence", value: String(format: "%.0f rpm", ride.avgCadence), icon: "arrow.clockwise")
+            StatCard(title: "Elevation", value: String(format: "↑ %.0f m", ride.elevationGain), icon: "mountain.2.fill")
             StatCard(title: "Battery", value: "\(ride.startBattery)% → \(ride.endBattery)%", icon: "battery.50")
         }
     }
@@ -146,6 +148,31 @@ struct RideDetailView: View {
             }
             .frame(height: 150)
             .chartYAxisLabel("Watts")
+        }
+        .padding()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var elevationChart: some View {
+        VStack(alignment: .leading) {
+            Text("Elevation")
+                .font(.headline)
+            Chart(sortedSamples.filter { $0.altitude != 0 }) { sample in
+                AreaMark(
+                    x: .value("Time", sample.timestamp),
+                    y: .value("m", sample.altitude)
+                )
+                .foregroundStyle(.brown.opacity(0.3))
+
+                LineMark(
+                    x: .value("Time", sample.timestamp),
+                    y: .value("m", sample.altitude)
+                )
+                .foregroundStyle(.brown)
+                .interpolationMethod(.catmullRom)
+            }
+            .frame(height: 150)
+            .chartYAxisLabel("m")
         }
         .padding()
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))

@@ -16,6 +16,9 @@ final class Ride {
     var maxPower: Double = 0          // W
     var avgCadence: Double = 0        // RPM
     var maxCadence: Double = 0        // RPM
+    var elevationGain: Double = 0     // meters climbed
+    var maxAltitude: Double = 0       // highest point (m)
+    var minAltitude: Double = 0       // lowest point (m)
     var startBattery: Int = 0         // %
     var endBattery: Int = 0           // %
 
@@ -49,6 +52,19 @@ final class Ride {
 
         startBattery = sorted.first?.batteryPercent ?? 0
         endBattery = sorted.last?.batteryPercent ?? 0
+
+        // Elevation gain: sum of positive altitude changes (uphill only)
+        let validAltitudes = sorted.map(\.altitude).filter { $0 != 0 }
+        if !validAltitudes.isEmpty {
+            maxAltitude = validAltitudes.max() ?? 0
+            minAltitude = validAltitudes.min() ?? 0
+            var gain = 0.0
+            for i in 1..<validAltitudes.count {
+                let diff = validAltitudes[i] - validAltitudes[i-1]
+                if diff > 0 { gain += diff }
+            }
+            elevationGain = gain
+        }
     }
 }
 
@@ -67,6 +83,7 @@ final class RideSample {
     var rideTime: Int = 0            // seconds
     var range: Int = 0               // km
     var errorCode: Int = 0
+    var packetLog: String = ""       // Timestamped TX/RX hex packets since last sample
 
     // GPS data (iOS-only bonus)
     var latitude: Double = 0
