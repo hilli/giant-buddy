@@ -129,19 +129,20 @@ class GiantBikeService: ObservableObject {
         sendTrigger(data)
     }
 
-    /// Send a trigger command: pause polling, write without BLE-level ACK
-    /// (matching Android's sendCommandWithoutResponse), then resume polling.
+    /// Send a trigger command: pause polling, write with BLE ACK
+    /// (Android uses WRITE_TYPE_DEFAULT for all commands including triggers),
+    /// then resume polling.
     private func sendTrigger(_ data: Data) {
         // Pause polling so the trigger isn't queued behind a polling write
         pollingTask?.cancel()
         pollingTask = nil
 
-        // Fire-and-forget write (Android uses WRITE_TYPE_NO_RESPONSE for triggers)
-        bikeManager?.writeWithoutResponse(data)
+        // Write with response (matching Android's WRITE_TYPE_DEFAULT)
+        bikeManager?.write(data)
 
         // Resume polling after a brief delay
         Task {
-            try? await Task.sleep(for: .milliseconds(200))
+            try? await Task.sleep(for: .milliseconds(500))
             startPolling()
         }
     }
