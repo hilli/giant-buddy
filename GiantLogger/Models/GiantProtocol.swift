@@ -173,13 +173,20 @@ enum GiantProtocol {
 
     static func parseFactoryData(_ plain: [UInt8]) -> FactoryData? {
         guard plain[0] == Command.readFactoryData.rawValue else { return nil }
-        let frameBytes = Array(plain[2...12])
-        let frameNumber = String(bytes: frameBytes, encoding: .ascii)?
-            .trimmingCharacters(in: .controlCharacters) ?? ""
+        // Android: d.i(2, 16, decrypted) → bArrS[0..13]
+        // bArrS[0] = speedLimitation, bArrS[1:2] = circumference (LE short),
+        // bArrS[3:7] = frameNumber (bit-encoded), bArrS[8] = evCategory,
+        // bArrS[10:13] = rcHwVersion (hex string)
+        let speedLim = Int(plain[2])
+        let circumference = Int(littleEndianUInt16(plain, offset: 3))
+        let rcHwBytes = Array(plain[12...15])
+        let rcHwVersion = rcHwBytes.map { String(format: "%02X", $0) }.joined()
         return FactoryData(
-            frameNumber: frameNumber,
-            rcType: Int(plain[13]),
-            rcHardwareVersion: littleEndianUInt16(plain, offset: 14)
+            speedLimitation: speedLim,
+            circumference: circumference,
+            frameNumber: "",  // populated from BLE peripheral name
+            evCategory: Int(plain[10]),
+            rcHardwareVersion: rcHwVersion
         )
     }
 
@@ -199,22 +206,27 @@ enum GiantProtocol {
 
     static func parseDiagnosticSyncDrive(_ plain: [UInt8]) -> SyncDriveData? {
         guard plain[0] == Command.diagnosticSyncDrive.rawValue else { return nil }
-        let fwVersion = "\(plain[3]).\(plain[4]).\(plain[5])"
-        let odometer = littleEndianUInt32(plain, offset: 6)
+        // Android: bArrI = d.i(2, 16, decrypted) → indices map to plain[2..15]
+        // bArrI[0]=ecode, [1:2]=speed/10, [3:4]=torque/10, [5:6]=cadence/10,
+        // [7:8]=acur/10, [9]=rsoce, [10]=light (bits 4-5: mask 0x30 >> 4)
         return SyncDriveData(
-            duType: Int(plain[2]),
-            firmwareVersion: fwVersion,
-            odometer: Int(odometer)
+            errorCode: Int(plain[2]),
+            speed: Double(littleEndianUInt16(plain, offset: 3)) / 10.0,
+            torque: Double(littleEndianUInt16(plain, offset: 5)) / 10.0,
+            cadence: Double(littleEndianUInt16(plain, offset: 7)) / 10.0,
+            assistCurrent: Double(littleEndianUInt16(plain, offset: 9)) / 10.0,
+            rsoc: Int(plain[11]),
+            lightMode: Int((plain[12] & 0x30) >> 4)
         )
     }
 
     static func parseDiagnosticEnergyPak(_ plain: [UInt8]) -> EnergyPakData? {
         guard plain[0] == Command.diagnosticEnergyPak.rawValue else { return nil }
-        let fwVersion = "\(plain[4]).\(plain[5]).\(plain[6])"
+        // Android: bArrI[0]=ecode, bArrI[1]=alm, alaUv=(bArrI[1] & 50) >= 1
         return EnergyPakData(
-            capacityPercent: Int(plain[2]),
-            lifePercent: Int(plain[3]),
-            firmwareVersion: fwVersion
+            errorCode: Int(plain[2]),
+            alarm: Int(plain[3]),
+            underVoltageAlarm: (plain[3] & 50) >= 1
         )
     }
 
@@ -294,12 +306,16 @@ struct RideData: Equatable {
     var rideTime: Int = 0        // seconds
     var range: Int = 0           // km
     var errorCode: Int = 0
+    var assistCurrent: Double = 0 // Amps from motor
+    var lightMode: Int = 0        // 0=OFF, 1=ON, 2=LOW, 3=HIGH
 }
 
 struct FactoryData: Equatable {
-    var frameNumber: String = ""
-    var rcType: Int = 0
-    var rcHardwareVersion: UInt16 = 0
+    var speedLimitation: Int = 0      // raw value (÷10 for km/h)
+    var circumference: Int = 0        // wheel circumference in mm
+    var frameNumber: String = ""      // from BLE device name
+    var evCategory: Int = 0
+    var rcHardwareVersion: String = ""
 }
 
 struct BatteryData: Equatable {
@@ -309,13 +325,17 @@ struct BatteryData: Equatable {
 }
 
 struct SyncDriveData: Equatable {
-    var duType: Int = 0
-    var firmwareVersion: String = ""
-    var odometer: Int = 0
+    var errorCode: Int = 0        // motor error code
+    var speed: Double = 0         // km/h
+    var torque: Double = 0        // Nm
+    var cadence: Double = 0       // RPM
+    var assistCurrent: Double = 0 // Amps
+    var rsoc: Int = 0             // remaining state of charge
+    var lightMode: Int = 0        // 0=OFF, 1=ON, 2=LOW, 3=HIGH
 }
 
 struct EnergyPakData: Equatable {
-    var capacityPercent: Int = 0
-    var lifePercent: Int = 0
-    var firmwareVersion: String = ""
+    var errorCode: Int = 0
+    var alarm: Int = 0
+    var underVoltageAlarm: Bool = false
 }

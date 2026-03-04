@@ -83,6 +83,8 @@ final class RideSample {
     var rideTime: Int = 0            // seconds
     var range: Int = 0               // km
     var errorCode: Int = 0
+    var assistCurrent: Double = 0    // Amps from motor
+    var lightMode: Int = 0           // 0=OFF, 1=ON, 2=LOW, 3=HIGH
     var packetLog: String = ""       // Timestamped TX/RX hex packets since last sample
 
     // GPS data (iOS-only bonus)
@@ -107,6 +109,8 @@ final class RideSample {
         self.rideTime = rideData.rideTime
         self.range = rideData.range
         self.errorCode = rideData.errorCode
+        self.assistCurrent = rideData.assistCurrent
+        self.lightMode = rideData.lightMode
         self.latitude = latitude
         self.longitude = longitude
         self.altitude = altitude

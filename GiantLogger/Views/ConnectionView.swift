@@ -94,14 +94,13 @@ struct ConnectionView: View {
         Section {
             if let factory = bikeService.factoryData {
                 InfoRow(label: "Frame", value: factory.frameNumber)
+                InfoRow(label: "Speed Limit", value: String(format: "%.1f km/h", Double(factory.speedLimitation) / 10.0))
+                InfoRow(label: "Wheel Circ.", value: "\(factory.circumference) mm")
             }
-            if let sync = bikeService.syncDriveData {
-                InfoRow(label: "Odometer", value: "\(sync.odometer) km")
-                InfoRow(label: "Motor FW", value: sync.firmwareVersion)
-            }
-            if let energy = bikeService.energyPakData {
-                InfoRow(label: "Battery Health", value: "\(energy.lifePercent)%")
-                InfoRow(label: "Battery FW", value: energy.firmwareVersion)
+            if let battery = bikeService.batteryData {
+                InfoRow(label: "Battery", value: "\(battery.capacityPercent)%")
+                InfoRow(label: "Battery Health", value: "\(battery.lifePercent)%")
+                InfoRow(label: "Full Capacity", value: String(format: "%.1f Wh", battery.lastFullCapacityWh))
             }
         } header: {
             Text("Bike Info")

@@ -203,11 +203,13 @@ class GiantBikeService: ObservableObject {
         pollingTask?.cancel()
         pollingTask = Task {
             while !Task.isCancelled {
-                requestRidingData()
+                requestDiagnosticSyncDrive()  // 0x16 — live motor telemetry (always responds)
                 try? await Task.sleep(for: .milliseconds(300))
-                requestBattery()
+                requestBattery()              // 0x13 — battery status (always responds)
                 try? await Task.sleep(for: .milliseconds(300))
-                requestRemainingRange()
+                requestRidingData()           // 0x1B — distance/time/watts (only while riding)
+                try? await Task.sleep(for: .milliseconds(300))
+                requestRemainingRange()       // 0x1D — range estimate (only while riding)
                 try? await Task.sleep(for: .seconds(2))
             }
         }
@@ -285,7 +287,15 @@ class GiantBikeService: ObservableObject {
     }
 
     private func handleReadFactoryData(_ plaintext: [UInt8]) {
-        factoryData = GiantProtocol.parseFactoryData(plaintext)
+        var factory = GiantProtocol.parseFactoryData(plaintext)
+        // Frame number bytes are often zeros; use BLE device name instead (e.g., "GCHA12354")
+        if let name = bikeManager?.connectedPeripheralName {
+            factory?.frameNumber = name
+        }
+        factoryData = factory
+        if let f = factory {
+            debugLog.log("GEV", "Factory: speedLimit=\(f.speedLimitation) circ=\(f.circumference)mm frame=\(f.frameNumber) cat=\(f.evCategory) rcHW=\(f.rcHardwareVersion)")
+        }
         logger.debug("Parsed factory data present=\(self.factoryData != nil)")
     }
 
@@ -303,13 +313,27 @@ class GiantBikeService: ObservableObject {
     }
 
     private func handleDiagnosticSyncDrive(_ plaintext: [UInt8]) {
-        syncDriveData = GiantProtocol.parseDiagnosticSyncDrive(plaintext)
-        logger.debug("Parsed SyncDrive data present=\(self.syncDriveData != nil)")
+        guard let parsed = GiantProtocol.parseDiagnosticSyncDrive(plaintext) else { return }
+        syncDriveData = parsed
+        // Map live motor telemetry into rideData for dashboard display
+        rideData.speed = parsed.speed
+        rideData.torque = parsed.torque
+        rideData.cadence = parsed.cadence
+        rideData.assistCurrent = parsed.assistCurrent
+        rideData.lightMode = parsed.lightMode
+        if parsed.errorCode != 0 {
+            rideData.errorCode = parsed.errorCode
+        }
+        logger.debug("SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) current=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
+        debugLog.log("GEV", "SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) acur=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
     }
 
     private func handleDiagnosticEnergyPak(_ plaintext: [UInt8]) {
         energyPakData = GiantProtocol.parseDiagnosticEnergyPak(plaintext)
-        logger.debug("Parsed EnergyPak data present=\(self.energyPakData != nil)")
+        if let ep = energyPakData {
+            logger.debug("EnergyPak: ecode=\(ep.errorCode) alarm=\(ep.alarm) uv=\(ep.underVoltageAlarm)")
+            debugLog.log("GEV", "EnergyPak: ecode=\(ep.errorCode) alarm=\(ep.alarm) uv=\(ep.underVoltageAlarm)")
+        }
     }
 
     private func logTX(_ data: Data) {

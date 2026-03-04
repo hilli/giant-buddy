@@ -122,6 +122,9 @@ struct DashboardView: View {
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
             Spacer()
+            if bikeService.isGevConnected {
+                lightStatusIcon
+            }
             if rideRecorder.isRecording {
                 HStack(spacing: 4) {
                     Circle()
@@ -166,6 +169,12 @@ struct DashboardView: View {
                 unit: "Nm",
                 icon: "gearshape.fill",
                 color: .purple
+            )
+            CompactMetricCard(
+                value: String(format: "%.1f", bikeService.rideData.assistCurrent),
+                unit: "A",
+                icon: "bolt.car.fill",
+                color: .cyan
             )
         }
     }
@@ -263,6 +272,9 @@ struct DashboardView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
+            if bikeService.isGevConnected {
+                lightStatusIcon
+            }
             if rideRecorder.isRecording {
                 HStack(spacing: 4) {
                     Circle()
@@ -296,6 +308,7 @@ struct DashboardView: View {
             GridItem(.flexible()),
             GridItem(.flexible()),
             GridItem(.flexible()),
+            GridItem(.flexible()),
         ], spacing: 12) {
             MetricCard(
                 title: "Power",
@@ -317,6 +330,13 @@ struct DashboardView: View {
                 unit: "Nm",
                 icon: "gearshape.fill",
                 color: .purple
+            )
+            MetricCard(
+                title: "Current",
+                value: String(format: "%.1f", bikeService.rideData.assistCurrent),
+                unit: "A",
+                icon: "bolt.car.fill",
+                color: .cyan
             )
         }
     }
@@ -510,6 +530,21 @@ struct DashboardView: View {
             .font(.title)
             .foregroundStyle(color)
             .symbolRenderingMode(.hierarchical)
+    }
+
+    private var lightStatusIcon: some View {
+        let mode = bikeService.rideData.lightMode
+        let icon: String
+        let color: Color
+        switch mode {
+        case 1: icon = "lightbulb.fill"; color = .yellow
+        case 2: icon = "lightbulb.min.fill"; color = .yellow.opacity(0.6)
+        case 3: icon = "lightbulb.max.fill"; color = .yellow
+        default: icon = "lightbulb.slash"; color = .gray
+        }
+        return Image(systemName: icon)
+            .font(.caption)
+            .foregroundStyle(color)
     }
 
     private var statusColor: Color {
