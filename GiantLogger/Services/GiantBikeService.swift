@@ -21,6 +21,13 @@ class GiantBikeService: ObservableObject {
     private var connectGEVAcked = false
     private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "GEV")
     private let debugLog = DebugLogger.shared
+    private var packetBuffer: [String] = []
+
+    func getAndClearPacketBuffer() -> String {
+        let log = packetBuffer.joined(separator: "\n")
+        packetBuffer.removeAll()
+        return log
+    }
 
     func attach(to bikeManager: BikeManager) {
         self.bikeManager = bikeManager
@@ -47,58 +54,78 @@ class GiantBikeService: ObservableObject {
     // MARK: - Commands
 
     func sendConnect() {
-        bikeManager?.write(GiantProtocol.connectCommand())
+        let data = GiantProtocol.connectCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func sendDisconnect() {
-        bikeManager?.write(GiantProtocol.disconnectCommand())
+        let data = GiantProtocol.disconnectCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func requestRidingData() {
-        bikeManager?.write(GiantProtocol.readRidingDataCommand())
+        let data = GiantProtocol.readRidingDataCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func requestFactoryData() {
-        bikeManager?.write(GiantProtocol.readFactoryDataCommand())
+        let data = GiantProtocol.readFactoryDataCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func requestBattery() {
-        bikeManager?.write(GiantProtocol.readBatteryCommand())
+        let data = GiantProtocol.readBatteryCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func requestRemainingRange() {
-        bikeManager?.write(GiantProtocol.readRemainingRangeCommand())
+        let data = GiantProtocol.readRemainingRangeCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func requestDiagnosticSyncDrive() {
-        bikeManager?.write(GiantProtocol.diagnosticSyncDriveCommand())
+        let data = GiantProtocol.diagnosticSyncDriveCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func requestDiagnosticEnergyPak() {
-        bikeManager?.write(GiantProtocol.diagnosticEnergyPakCommand())
+        let data = GiantProtocol.diagnosticEnergyPakCommand()
+        logTX(data)
+        bikeManager?.write(data)
     }
 
     func toggleLight() {
         let data = GiantProtocol.triggerLightCommand()
         debugLog.log("GEV", "TRIGGER light → \(data.count)B")
+        logTX(data)
         sendTrigger(data)
     }
 
     func assistUp() {
         let data = GiantProtocol.triggerAssistUpCommand()
         debugLog.log("GEV", "TRIGGER assistUp → \(data.count)B")
+        logTX(data)
         sendTrigger(data)
     }
 
     func assistDown() {
         let data = GiantProtocol.triggerAssistDownCommand()
         debugLog.log("GEV", "TRIGGER assistDown → \(data.count)B")
+        logTX(data)
         sendTrigger(data)
     }
 
     func togglePower() {
         let data = GiantProtocol.triggerPowerCommand()
         debugLog.log("GEV", "TRIGGER power → \(data.count)B")
+        logTX(data)
         sendTrigger(data)
     }
 
@@ -199,6 +226,7 @@ class GiantBikeService: ObservableObject {
         let cmdHex = String(format: "0x%02X", commandID)
         logger.debug("RX cmd=0x\(String(commandID, radix: 16), privacy: .public)")
         debugLog.log("GEV", "RX cmd=\(cmdHex) plain=\(plaintext.map { String(format: "%02X", $0) }.joined())")
+        packetBuffer.append("RX \(cmdHex) \(hexString(data))")
 
         switch commandID {
         case GiantProtocol.Command.connectGEV.rawValue:
@@ -282,6 +310,10 @@ class GiantBikeService: ObservableObject {
     private func handleDiagnosticEnergyPak(_ plaintext: [UInt8]) {
         energyPakData = GiantProtocol.parseDiagnosticEnergyPak(plaintext)
         logger.debug("Parsed EnergyPak data present=\(self.energyPakData != nil)")
+    }
+
+    private func logTX(_ data: Data) {
+        packetBuffer.append("TX \(hexString(data))")
     }
 
     private func hexString(_ data: Data) -> String {

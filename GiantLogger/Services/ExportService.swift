@@ -6,7 +6,7 @@ enum ExportService {
     // MARK: - CSV Export (compatible with ESP32 format + GPS columns)
 
     static func exportCSV(ride: Ride) -> String {
-        let header = "timestamp,speed_kmh,cadence_rpm,torque_nm,watts,battery_pct,distance_km,ride_time_s,range_km,error,latitude,longitude,altitude,gps_speed_ms,course"
+        let header = "timestamp,speed_kmh,cadence_rpm,torque_nm,watts,battery_pct,distance_km,ride_time_s,range_km,error,latitude,longitude,altitude,gps_speed_ms,course,packet_log"
 
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
@@ -28,6 +28,7 @@ enum ExportService {
                 String(format: "%.1f", s.altitude),
                 String(format: "%.1f", s.gpsSpeed),
                 String(format: "%.0f", s.course),
+                "\"\(s.packetLog.replacingOccurrences(of: "\"", with: "\"\""))\"",
             ].joined(separator: ",")
         }
 

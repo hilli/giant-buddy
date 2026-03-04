@@ -90,6 +90,7 @@ class RideRecorder: ObservableObject {
             course: max(0, location?.course ?? 0)
         )
         sample.ride = currentRide
+        sample.packetLog = bikeService.getAndClearPacketBuffer()
         currentRide.samples.append(sample)
         modelContext.insert(sample)
         sampleCount += 1
