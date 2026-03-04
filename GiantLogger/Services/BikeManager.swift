@@ -2,6 +2,7 @@ import Foundation
 import CoreBluetooth
 import Combine
 import OSLog
+import UIKit
 
 /// Manages BLE scanning, connection, and characteristic I/O for the Giant GEV service.
 @MainActor
@@ -44,7 +45,9 @@ class BikeManager: NSObject, ObservableObject {
            let uuid = UUID(uuidString: savedID) {
             autoConnectIdentifier = uuid
         }
-        centralManager = CBCentralManager(delegate: self, queue: nil)
+        centralManager = CBCentralManager(delegate: self, queue: nil, options: [
+            CBCentralManagerOptionRestoreIdentifierKey: "dk.hilli.GiantLogger.central"
+        ])
     }
 
     func startScan() {
@@ -61,11 +64,13 @@ class BikeManager: NSObject, ObservableObject {
             CBCentralManagerScanOptionAllowDuplicatesKey: false
         ])
 
-        // Stop scanning after 15 seconds
-        Task {
-            try? await Task.sleep(for: .seconds(15))
-            if connectionState == .scanning {
-                stopScan()
+        // Only timeout in foreground — background scans should persist
+        if UIApplication.shared.applicationState == .active {
+            Task {
+                try? await Task.sleep(for: .seconds(15))
+                if connectionState == .scanning {
+                    stopScan()
+                }
             }
         }
     }
@@ -135,6 +140,22 @@ class BikeManager: NSObject, ObservableObject {
 // MARK: - CBCentralManagerDelegate
 
 extension BikeManager: CBCentralManagerDelegate {
+    nonisolated func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        Task { @MainActor in
+            debugLog.log("BLE", "State restoration triggered")
+            if let peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral],
+               let peripheral = peripherals.first {
+                connectedPeripheral = peripheral
+                peripheral.delegate = self
+                connectedPeripheralName = peripheral.name
+                if peripheral.state == .connected {
+                    connectionState = .discoveringServices
+                    peripheral.discoverServices([serviceUUID])
+                }
+            }
+        }
+    }
+
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         Task { @MainActor in
             logger.info("Central state updated: \(central.state.rawValue)")

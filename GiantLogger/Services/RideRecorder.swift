@@ -11,13 +11,20 @@ class RideRecorder: ObservableObject {
     @Published var sampleCount = 0
 
     var recordingInterval: TimeInterval = 2.0
-    var autoRecord = false
+    var autoRecord: Bool {
+        get { UserDefaults.standard.bool(forKey: "autoRecord") }
+        set { UserDefaults.standard.set(newValue, forKey: "autoRecord") }
+    }
 
     private var bikeService: GiantBikeService?
     private var locationManager: LocationManager?
     private var modelContext: ModelContext?
     private var recordingTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        UserDefaults.standard.register(defaults: ["autoRecord": true])
+    }
 
     func configure(bikeService: GiantBikeService, locationManager: LocationManager, modelContext: ModelContext) {
         self.bikeService = bikeService
