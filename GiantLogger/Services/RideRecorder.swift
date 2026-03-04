@@ -21,6 +21,8 @@ class RideRecorder: ObservableObject {
     private var modelContext: ModelContext?
     private var recordingTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+    private var accumulatedDistance: Double = 0  // km
+    private var lastSampleLocation: (lat: Double, lon: Double)?
 
     init() {
         UserDefaults.standard.register(defaults: ["autoRecord": true])
@@ -53,6 +55,8 @@ class RideRecorder: ObservableObject {
         currentRide = ride
         isRecording = true
         sampleCount = 0
+        accumulatedDistance = 0
+        lastSampleLocation = nil
 
         locationManager?.startTracking()
 
@@ -87,11 +91,34 @@ class RideRecorder: ObservableObject {
     private func recordSample() {
         guard let bikeService, let currentRide, let modelContext else { return }
 
+        // Skip recording until we have battery data (avoids 0% initial samples)
+        if bikeService.batteryData == nil { return }
+
         let location = locationManager?.currentLocation
+        let lat = location?.coordinate.latitude ?? 0
+        let lon = location?.coordinate.longitude ?? 0
+
+        // Accumulate GPS distance (Haversine)
+        if let last = lastSampleLocation, lat != 0 || lon != 0 {
+            let delta = Self.haversineDistance(
+                lat1: last.lat, lon1: last.lon,
+                lat2: lat, lon2: lon
+            )
+            if delta > 0.001 { // Ignore GPS jitter < 1m
+                accumulatedDistance += delta
+            }
+        }
+        if lat != 0 || lon != 0 {
+            lastSampleLocation = (lat, lon)
+        }
+
+        // Update rideData distance from GPS accumulation
+        bikeService.rideData.distance = accumulatedDistance
+
         let sample = RideSample(
             rideData: bikeService.rideData,
-            latitude: location?.coordinate.latitude ?? 0,
-            longitude: location?.coordinate.longitude ?? 0,
+            latitude: lat,
+            longitude: lon,
             altitude: location?.altitude ?? 0,
             gpsSpeed: max(0, location?.speed ?? 0),
             course: max(0, location?.course ?? 0)
@@ -106,5 +133,17 @@ class RideRecorder: ObservableObject {
         if sampleCount % 10 == 0 {
             try? modelContext.save()
         }
+    }
+
+    /// Haversine distance in kilometers between two GPS coordinates.
+    private static func haversineDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
+        let R = 6371.0 // Earth radius in km
+        let dLat = (lat2 - lat1) * .pi / 180
+        let dLon = (lon2 - lon1) * .pi / 180
+        let a = sin(dLat / 2) * sin(dLat / 2) +
+                cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
+                sin(dLon / 2) * sin(dLon / 2)
+        let c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return R * c
     }
 }

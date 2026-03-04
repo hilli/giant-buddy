@@ -306,6 +306,15 @@ extension BikeManager: CBPeripheralDelegate {
             notificationReceived.send(data)
         }
     }
+
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: (any Error)?) {
+        Task { @MainActor in
+            if let error {
+                logger.error("BLE write failed: \(error.localizedDescription, privacy: .public)")
+                debugLog.log("BLE", "ERROR: Write failed: \(error.localizedDescription)")
+            }
+        }
+    }
 }
 
 private extension Data {

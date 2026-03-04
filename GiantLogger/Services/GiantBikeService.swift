@@ -129,19 +129,20 @@ class GiantBikeService: ObservableObject {
         sendTrigger(data)
     }
 
-    /// Send a trigger command: pause polling, write with BLE ACK
-    /// (Android uses WRITE_TYPE_DEFAULT for all commands including triggers),
-    /// then resume polling.
+    /// Send a trigger command: pause polling, wait for in-flight writes to clear,
+    /// write with BLE ACK (Android uses WRITE_TYPE_DEFAULT for all commands),
+    /// then resume polling after a delay.
     private func sendTrigger(_ data: Data) {
         // Pause polling so the trigger isn't queued behind a polling write
         pollingTask?.cancel()
         pollingTask = nil
 
-        // Write with response (matching Android's WRITE_TYPE_DEFAULT)
-        bikeManager?.write(data)
-
-        // Resume polling after a brief delay
         Task {
+            // Wait for any in-flight polling writes to complete
+            try? await Task.sleep(for: .milliseconds(300))
+            // Write trigger with response (matching Android's WRITE_TYPE_DEFAULT)
+            bikeManager?.write(data)
+            // Wait for trigger write acknowledgment before resuming polling
             try? await Task.sleep(for: .milliseconds(500))
             startPolling()
         }
@@ -322,11 +323,17 @@ class GiantBikeService: ObservableObject {
         rideData.cadence = parsed.cadence
         rideData.assistCurrent = parsed.assistCurrent
         rideData.lightMode = parsed.lightMode
+        // Calculate power from torque × cadence (P = τ × ω = τ × rpm × 2π/60)
+        if parsed.cadence > 0 && parsed.torque > 0 {
+            rideData.watts = parsed.torque * parsed.cadence * 2.0 * .pi / 60.0
+        } else {
+            rideData.watts = 0
+        }
         if parsed.errorCode != 0 {
             rideData.errorCode = parsed.errorCode
         }
-        logger.debug("SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) current=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
-        debugLog.log("GEV", "SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) acur=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
+        logger.debug("SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) watts=\(self.rideData.watts) current=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
+        debugLog.log("GEV", "SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) watts=\(String(format: "%.0f", self.rideData.watts)) acur=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
     }
 
     private func handleDiagnosticEnergyPak(_ plaintext: [UInt8]) {

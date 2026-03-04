@@ -36,6 +36,7 @@ final class Ride {
 
         endDate = sorted.last?.timestamp
         duration = Int((endDate ?? startDate).timeIntervalSince(startDate))
+        // Use GPS-accumulated distance from last sample
         totalDistance = sorted.last?.distance ?? 0
 
         let movingSamples = sorted.filter { $0.speed > 0.5 }
