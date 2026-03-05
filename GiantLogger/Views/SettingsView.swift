@@ -83,6 +83,26 @@ struct SettingsView: View {
 
                 debugLogSection
 
+                if logWorkouts {
+                    Section {
+                        Button {
+                            workoutManager.requestAuthorization()
+                        } label: {
+                            Label("Re-request HealthKit Permissions", systemImage: "heart.text.square")
+                        }
+
+                        Button {
+                            workoutManager.injectSampleWorkout()
+                        } label: {
+                            Label("Inject Sample Workout", systemImage: "plus.circle")
+                        }
+                    } header: {
+                        Text("HealthKit Debug")
+                    } footer: {
+                        Text("Inject creates a fake 10-min / 5 km cycling workout in Apple Health to verify the pipeline works.")
+                    }
+                }
+
                 Section {
                     HStack {
                         Text("Version")
