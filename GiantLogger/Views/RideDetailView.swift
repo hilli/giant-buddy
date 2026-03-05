@@ -4,8 +4,7 @@ import Charts
 
 struct RideDetailView: View {
     let ride: Ride
-    @State private var showingShareSheet = false
-    @State private var exportURL: URL?
+    @State private var exportURL: IdentifiableURL?
 
     private var sortedSamples: [RideSample] {
         ride.samples.sorted { $0.timestamp < $1.timestamp }
@@ -58,10 +57,8 @@ struct RideDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingShareSheet) {
-            if let url = exportURL {
-                ShareSheet(items: [url])
-            }
+        .sheet(item: $exportURL) { item in
+            ShareSheet(items: [item.url])
         }
     }
 
@@ -204,16 +201,17 @@ struct RideDetailView: View {
 
     private func exportAs(_ format: ExportFormat) {
         let dateStr = ride.startDate.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+        var url: URL?
         switch format {
         case .csv:
             let content = ExportService.exportCSV(ride: ride)
-            exportURL = ExportService.writeToTempFile(content: content, filename: "ride_\(dateStr).csv")
+            url = ExportService.writeToTempFile(content: content, filename: "ride_\(dateStr).csv")
         case .gpx:
             let content = ExportService.exportGPX(ride: ride)
-            exportURL = ExportService.writeToTempFile(content: content, filename: "ride_\(dateStr).gpx")
+            url = ExportService.writeToTempFile(content: content, filename: "ride_\(dateStr).gpx")
         }
-        if exportURL != nil {
-            showingShareSheet = true
+        if let url {
+            exportURL = IdentifiableURL(url: url)
         }
     }
 
@@ -252,6 +250,11 @@ struct StatCard: View {
         .padding(12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
     }
+}
+
+struct IdentifiableURL: Identifiable {
+    let id = UUID()
+    let url: URL
 }
 
 struct ShareSheet: UIViewControllerRepresentable {
