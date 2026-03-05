@@ -18,6 +18,10 @@ class RideRecorder: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: "autoRecord") }
     }
 
+    var logWorkouts: Bool {
+        UserDefaults.standard.bool(forKey: "logWorkouts")
+    }
+
     private var bikeService: GiantBikeService?
     private var locationManager: LocationManager?
     private var workoutManager: WorkoutManager?
@@ -68,7 +72,7 @@ class RideRecorder: ObservableObject {
         recordingStartDate = Date()
 
         locationManager?.startTracking()
-        workoutManager?.startWorkout()
+        if logWorkouts { workoutManager?.startWorkout() }
 
         // Tick elapsed time every second
         durationTask = Task {
@@ -101,13 +105,15 @@ class RideRecorder: ObservableObject {
             if ride.samples.isEmpty || accumulatedDistance < 0.01 {
                 modelContext?.delete(ride)
             } else {
-                // Save workout to HealthKit
-                workoutManager?.stopWorkout(
-                    distance: ride.totalDistance,
-                    elevationGain: ride.elevationGain,
-                    avgPower: ride.avgPower,
-                    duration: TimeInterval(ride.duration)
-                )
+                // Save workout to HealthKit if enabled
+                if logWorkouts {
+                    workoutManager?.stopWorkout(
+                        distance: ride.totalDistance,
+                        elevationGain: ride.elevationGain,
+                        avgPower: ride.avgPower,
+                        duration: TimeInterval(ride.duration)
+                    )
+                }
             }
         }
         try? modelContext?.save()
@@ -173,7 +179,7 @@ class RideRecorder: ObservableObject {
         }
 
         // Feed GPS location to workout route builder
-        if let location {
+        if logWorkouts, let location {
             workoutManager?.addRouteLocation(location)
         }
     }

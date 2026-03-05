@@ -3,9 +3,11 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var bikeManager: BikeManager
     @EnvironmentObject var rideRecorder: RideRecorder
+    @EnvironmentObject var workoutManager: WorkoutManager
 
     @AppStorage("autoRecord") private var autoRecord = true
     @AppStorage("recordingInterval") private var recordingInterval = 2.0
+    @AppStorage("logWorkouts") private var logWorkouts = false
     @AppStorage("savedDeviceName") private var savedDeviceName = ""
     @AppStorage("savedDeviceID") private var savedDeviceID = ""
 
@@ -21,6 +23,11 @@ struct SettingsView: View {
                             rideRecorder.autoRecord = newValue
                         }
 
+                    Toggle("Log to Apple Fitness", isOn: $logWorkouts)
+                        .onChange(of: logWorkouts) { _, enabled in
+                            if enabled { workoutManager.requestAuthorization() }
+                        }
+
                     Picker("Recording Interval", selection: $recordingInterval) {
                         Text("1 second").tag(1.0)
                         Text("2 seconds").tag(2.0)
@@ -33,7 +40,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Recording")
                 } footer: {
-                    Text("Shorter intervals capture more detail but use more storage.")
+                    Text("When enabled, rides are saved as Outdoor Cycle workouts in Apple Health.")
                 }
 
                 Section {

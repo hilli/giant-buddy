@@ -43,7 +43,9 @@ struct ContentView: View {
                     workoutManager: workoutManager,
                     modelContext: modelContext
                 )
-                workoutManager.requestAuthorization()
+                if UserDefaults.standard.bool(forKey: "logWorkouts") {
+                    workoutManager.requestAuthorization()
+                }
                 hasConfigured = true
             }
         }
