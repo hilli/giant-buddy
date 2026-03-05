@@ -18,12 +18,12 @@ enum GiantProtocol {
     enum Command: UInt8 {
         case connectGEV          = 0x02
         case readFactoryData     = 0x03
+        case bikeDataRideControl = 0x11  // ACTIVE_DATA_RIDE_CONTROL_1 — range per assist mode
         case readBattery         = 0x13
         case diagnosticSyncDrive = 0x16
         case diagnosticEnergyPak = 0x17
         case readRidingData      = 0x1B
         case triggerAction       = 0x1C
-        case readRemainingRange  = 0x1D
         case disconnectGEV       = 0x21
         case readTuningData      = 0x2C
     }
@@ -108,8 +108,8 @@ enum GiantProtocol {
         buildPacket(command: .readBattery)
     }
 
-    static func readRemainingRangeCommand() -> Data {
-        buildPacket(command: .readRemainingRange)
+    static func readBikeDataRideControlCommand() -> Data {
+        buildPacket(command: .bikeDataRideControl)
     }
 
     static func diagnosticEnergyPakCommand() -> Data {
@@ -166,7 +166,6 @@ enum GiantProtocol {
             batteryPercent: Int(plain[10]),
             distance: Double(littleEndianUInt16(plain, offset: 11)) / 10.0,
             rideTime: Int(littleEndianUInt16(plain, offset: 13)),
-            range: 0,
             errorCode: Int(plain[15])
         )
     }
@@ -190,9 +189,26 @@ enum GiantProtocol {
         )
     }
 
-    static func parseRemainingRange(_ plain: [UInt8]) -> Int? {
-        guard plain[0] == Command.readRemainingRange.rawValue else { return nil }
-        return Int(littleEndianUInt16(plain, offset: 2))
+    /// Parse ACTIVE_DATA_RIDE_CONTROL_1 (0x11) response into per-mode range estimates.
+    /// Byte mapping from Android APK `readRemainingRange()`:
+    /// plaintext[2..13] → eco, normal, power, boostPlus, boost, powerPlus,
+    ///                     climbPlus, climb, normalPlus, tourPlus, tour, smart
+    static func parseRemainingRange(_ plain: [UInt8]) -> RemainingRangeData? {
+        guard plain[0] == Command.bikeDataRideControl.rawValue else { return nil }
+        return RemainingRangeData(
+            eco: Int(plain[2]),
+            normal: Int(plain[3]),
+            power: Int(plain[4]),
+            boostPlus: Int(plain[5]),
+            boost: Int(plain[6]),
+            powerPlus: Int(plain[7]),
+            climbPlus: Int(plain[8]),
+            climb: Int(plain[9]),
+            normalPlus: Int(plain[10]),
+            tourPlus: Int(plain[11]),
+            tour: Int(plain[12]),
+            smart: Int(plain[13])
+        )
     }
 
     static func parseBatteryData(_ plain: [UInt8]) -> BatteryData? {
@@ -304,10 +320,15 @@ struct RideData: Equatable {
     var batteryPercent: Int = 0  // 0-100
     var distance: Double = 0     // km
     var rideTime: Int = 0        // seconds
-    var range: Int = 0           // km
+    var rangeData: RemainingRangeData? // per-mode range from 0x11
     var errorCode: Int = 0
     var assistCurrent: Double = 0 // Amps from motor
     var lightMode: Int = 0        // 0=OFF, 1=ON, 2=LOW, 3=HIGH
+
+    /// Best available range estimate: eco (max range) when all modes are available
+    var range: Int {
+        rangeData?.eco ?? 0
+    }
 }
 
 struct FactoryData: Equatable {
@@ -338,4 +359,33 @@ struct EnergyPakData: Equatable {
     var errorCode: Int = 0
     var alarm: Int = 0
     var underVoltageAlarm: Bool = false
+}
+
+/// Range estimates (km) per assist mode from ACTIVE_DATA_RIDE_CONTROL_1 (0x11).
+struct RemainingRangeData: Equatable {
+    var eco: Int = 0
+    var normal: Int = 0
+    var power: Int = 0
+    var boostPlus: Int = 0
+    var boost: Int = 0
+    var powerPlus: Int = 0
+    var climbPlus: Int = 0
+    var climb: Int = 0
+    var normalPlus: Int = 0
+    var tourPlus: Int = 0
+    var tour: Int = 0
+    var smart: Int = 0
+
+    /// All modes as label-value pairs (only non-zero)
+    var nonZeroModes: [(label: String, range: Int)] {
+        let all: [(String, Int)] = [
+            ("Eco", eco), ("Normal", normal), ("Normal+", normalPlus),
+            ("Tour", tour), ("Tour+", tourPlus),
+            ("Power", power), ("Power+", powerPlus),
+            ("Boost", boost), ("Boost+", boostPlus),
+            ("Climb", climb), ("Climb+", climbPlus),
+            ("Smart", smart),
+        ]
+        return all.filter { $0.1 > 0 }
+    }
 }

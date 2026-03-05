@@ -84,7 +84,7 @@ class GiantBikeService: ObservableObject {
     }
 
     func requestRemainingRange() {
-        let data = GiantProtocol.readRemainingRangeCommand()
+        let data = GiantProtocol.readBikeDataRideControlCommand()
         logTX(data)
         bikeManager?.write(data)
     }
@@ -211,7 +211,7 @@ class GiantBikeService: ObservableObject {
                 try? await Task.sleep(for: .milliseconds(300))
                 requestRidingData()           // 0x1B — distance/time/watts (only while riding)
                 try? await Task.sleep(for: .milliseconds(300))
-                requestRemainingRange()       // 0x1D — range estimate (only while riding)
+                requestRemainingRange()       // 0x11 — range per assist mode
                 try? await Task.sleep(for: .seconds(2))
             }
         }
@@ -239,8 +239,8 @@ class GiantBikeService: ObservableObject {
         case GiantProtocol.Command.readRidingData.rawValue:
             handleReadRidingData(plaintext)
 
-        case GiantProtocol.Command.readRemainingRange.rawValue:
-            handleReadRemainingRange(plaintext)
+        case GiantProtocol.Command.bikeDataRideControl.rawValue:
+            handleRemainingRange(plaintext)
 
         case GiantProtocol.Command.readFactoryData.rawValue:
             handleReadFactoryData(plaintext)
@@ -276,16 +276,18 @@ class GiantBikeService: ObservableObject {
     private func handleReadRidingData(_ plaintext: [UInt8]) {
         guard let parsed = GiantProtocol.parseRidingData(plaintext) else { return }
         var updated = parsed
-        updated.range = rideData.range
+        updated.rangeData = rideData.rangeData
         rideData = updated
         logger.debug("Parsed riding data: speed=\(updated.speed) battery=\(updated.batteryPercent)")
         debugLog.log("GEV", "Riding: speed=\(updated.speed) battery=\(updated.batteryPercent)% cadence=\(updated.cadence) watts=\(updated.watts)")
     }
 
-    private func handleReadRemainingRange(_ plaintext: [UInt8]) {
-        guard let range = GiantProtocol.parseRemainingRange(plaintext) else { return }
-        rideData.range = range
-        logger.debug("Parsed remaining range: \(range)")
+    private func handleRemainingRange(_ plaintext: [UInt8]) {
+        guard let rangeData = GiantProtocol.parseRemainingRange(plaintext) else { return }
+        rideData.rangeData = rangeData
+        let modes = rangeData.nonZeroModes.map { "\($0.label)=\($0.range)km" }.joined(separator: " ")
+        logger.debug("Range: \(modes, privacy: .public)")
+        debugLog.log("GEV", "Range: \(modes)")
     }
 
     private func handleReadFactoryData(_ plaintext: [UInt8]) {
