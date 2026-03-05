@@ -158,7 +158,7 @@ tasks:
     desc: Build and deploy to connected iOS device
     vars:
       DEVICE_ID:
-        sh: xcrun devicectl list devices 2>/dev/null | grep -i "iphone" | grep -i "available" | awk '{print $3}' | head -1
+        sh: xcrun devicectl list devices 2>/dev/null | grep -i "iphone" | grep -iE "available|connected" | awk '{print $3}' | head -1
     cmds:
       - echo "Deploying to device {{.DEVICE_ID}}..."
       - >-
@@ -183,7 +183,7 @@ tasks:
     desc: Build and deploy over WiFi (device must be paired)
     vars:
       DEVICE_ID:
-        sh: xcrun devicectl list devices 2>/dev/null | grep -i "iphone" | grep -i "available" | awk '{print $3}' | head -1
+        sh: xcrun devicectl list devices 2>/dev/null | grep -i "iphone" | grep -iE "available|connected" | awk '{print $3}' | head -1
     cmds:
       - echo "Deploying to device {{.DEVICE_ID}}..."
       - >-
@@ -208,10 +208,9 @@ tasks:
     desc: Build release and deploy to connected iOS device
     vars:
       DEVICE_ID:
-        sh: xcrun devicectl list devices 2>/dev/null | grep -i "iphone" | grep -i "available" | awk '{print $3}' | head -1
+        sh: xcrun devicectl list devices 2>/dev/null | grep -i "iphone" | grep -iE "available|connected" | awk '{print $3}' | head -1
     cmds:
-      - echo "Deploying to device {{.DEVICE_ID}}..."
-      - >-
+      - echo "Deploying to device {{.DEVICE_ID}}..."      - >-
         xcodebuild
         -project {{.PROJECT}}
         -scheme {{.SCHEME}}
