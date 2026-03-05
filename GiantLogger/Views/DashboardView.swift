@@ -76,6 +76,10 @@ struct DashboardView: View {
             if locationManager.currentLocation == nil {
                 locationManager.requestSingleLocation()
             }
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
 
@@ -201,7 +205,7 @@ struct DashboardView: View {
                 Image(systemName: "timer")
                     .font(.caption2)
                     .foregroundStyle(.cyan)
-                Text(formatDuration(bikeService.rideData.rideTime))
+                Text(formatDuration(rideRecorder.isRecording ? rideRecorder.elapsedSeconds : bikeService.rideData.rideTime))
                     .font(.caption.bold())
                     .monospacedDigit()
             }
@@ -371,7 +375,7 @@ struct DashboardView: View {
                 HStack {
                     Image(systemName: "timer")
                         .foregroundStyle(.cyan)
-                    Text(formatDuration(bikeService.rideData.rideTime))
+                    Text(formatDuration(rideRecorder.isRecording ? rideRecorder.elapsedSeconds : bikeService.rideData.rideTime))
                         .font(.callout.bold())
                         .monospacedDigit()
                 }

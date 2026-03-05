@@ -9,6 +9,7 @@ class RideRecorder: ObservableObject {
     @Published var isRecording = false
     @Published var currentRide: Ride?
     @Published var sampleCount = 0
+    @Published var elapsedSeconds: Int = 0
 
     var recordingInterval: TimeInterval = 2.0
     var autoRecord: Bool {
@@ -20,9 +21,11 @@ class RideRecorder: ObservableObject {
     private var locationManager: LocationManager?
     private var modelContext: ModelContext?
     private var recordingTask: Task<Void, Never>?
+    private var durationTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private var accumulatedDistance: Double = 0  // km
     private var lastSampleLocation: (lat: Double, lon: Double)?
+    private var recordingStartDate: Date?
 
     init() {
         UserDefaults.standard.register(defaults: ["autoRecord": true])
@@ -33,12 +36,12 @@ class RideRecorder: ObservableObject {
         self.locationManager = locationManager
         self.modelContext = modelContext
 
-        // Auto-start recording when GEV connects
+        // Auto-start recording when GEV connects; always stop on disconnect
         bikeService.$isGevConnected
             .receive(on: DispatchQueue.main)
             .sink { [weak self] connected in
-                guard let self, self.autoRecord else { return }
-                if connected && !self.isRecording {
+                guard let self else { return }
+                if connected && self.autoRecord && !self.isRecording {
                     self.startRecording()
                 } else if !connected && self.isRecording {
                     self.stopRecording()
@@ -55,10 +58,22 @@ class RideRecorder: ObservableObject {
         currentRide = ride
         isRecording = true
         sampleCount = 0
+        elapsedSeconds = 0
         accumulatedDistance = 0
         lastSampleLocation = nil
+        recordingStartDate = Date()
 
         locationManager?.startTracking()
+
+        // Tick elapsed time every second
+        durationTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                if let start = recordingStartDate {
+                    elapsedSeconds = Int(Date().timeIntervalSince(start))
+                }
+            }
+        }
 
         recordingTask = Task {
             while !Task.isCancelled {
@@ -71,13 +86,22 @@ class RideRecorder: ObservableObject {
     func stopRecording() {
         recordingTask?.cancel()
         recordingTask = nil
+        durationTask?.cancel()
+        durationTask = nil
         isRecording = false
 
-        currentRide?.computeSummary()
+        // Discard rides where user hasn't moved (< 10m) or has no samples
+        if let ride = currentRide {
+            ride.computeSummary()
+            if ride.samples.isEmpty || accumulatedDistance < 0.01 {
+                modelContext?.delete(ride)
+            }
+        }
         try? modelContext?.save()
 
         locationManager?.stopTracking()
         currentRide = nil
+        recordingStartDate = nil
     }
 
     func toggleRecording() {
@@ -112,8 +136,9 @@ class RideRecorder: ObservableObject {
             lastSampleLocation = (lat, lon)
         }
 
-        // Update rideData distance from GPS accumulation
+        // Update rideData distance and time from local tracking
         bikeService.rideData.distance = accumulatedDistance
+        bikeService.rideData.rideTime = elapsedSeconds
 
         let sample = RideSample(
             rideData: bikeService.rideData,
