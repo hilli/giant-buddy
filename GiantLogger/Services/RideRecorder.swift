@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Combine
+import CoreLocation
 
 /// Records ride telemetry + GPS samples and manages ride lifecycle.
 @MainActor
@@ -19,6 +20,7 @@ class RideRecorder: ObservableObject {
 
     private var bikeService: GiantBikeService?
     private var locationManager: LocationManager?
+    private var workoutManager: WorkoutManager?
     private var modelContext: ModelContext?
     private var recordingTask: Task<Void, Never>?
     private var durationTask: Task<Void, Never>?
@@ -31,9 +33,11 @@ class RideRecorder: ObservableObject {
         UserDefaults.standard.register(defaults: ["autoRecord": true])
     }
 
-    func configure(bikeService: GiantBikeService, locationManager: LocationManager, modelContext: ModelContext) {
+    func configure(bikeService: GiantBikeService, locationManager: LocationManager,
+                   workoutManager: WorkoutManager, modelContext: ModelContext) {
         self.bikeService = bikeService
         self.locationManager = locationManager
+        self.workoutManager = workoutManager
         self.modelContext = modelContext
 
         // Auto-start recording when GEV connects; always stop on disconnect
@@ -64,6 +68,7 @@ class RideRecorder: ObservableObject {
         recordingStartDate = Date()
 
         locationManager?.startTracking()
+        workoutManager?.startWorkout()
 
         // Tick elapsed time every second
         durationTask = Task {
@@ -95,6 +100,14 @@ class RideRecorder: ObservableObject {
             ride.computeSummary()
             if ride.samples.isEmpty || accumulatedDistance < 0.01 {
                 modelContext?.delete(ride)
+            } else {
+                // Save workout to HealthKit
+                workoutManager?.stopWorkout(
+                    distance: ride.totalDistance,
+                    elevationGain: ride.elevationGain,
+                    avgPower: ride.avgPower,
+                    duration: TimeInterval(ride.duration)
+                )
             }
         }
         try? modelContext?.save()
@@ -157,6 +170,11 @@ class RideRecorder: ObservableObject {
         // Periodic save
         if sampleCount % 10 == 0 {
             try? modelContext.save()
+        }
+
+        // Feed GPS location to workout route builder
+        if let location {
+            workoutManager?.addRouteLocation(location)
         }
     }
 

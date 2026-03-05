@@ -6,6 +6,7 @@ struct ContentView: View {
     @EnvironmentObject var bikeService: GiantBikeService
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var rideRecorder: RideRecorder
+    @EnvironmentObject var workoutManager: WorkoutManager
     @Environment(\.modelContext) private var modelContext
 
     @State private var hasConfigured = false
@@ -39,8 +40,10 @@ struct ContentView: View {
                 rideRecorder.configure(
                     bikeService: bikeService,
                     locationManager: locationManager,
+                    workoutManager: workoutManager,
                     modelContext: modelContext
                 )
+                workoutManager.requestAuthorization()
                 hasConfigured = true
             }
         }

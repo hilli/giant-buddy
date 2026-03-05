@@ -8,6 +8,7 @@ struct GiantLoggerApp: App {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var rideRecorder = RideRecorder()
     @StateObject private var weatherManager = WeatherManager()
+    @StateObject private var workoutManager = WorkoutManager()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([Ride.self, RideSample.self])
@@ -32,6 +33,7 @@ struct GiantLoggerApp: App {
                 .environmentObject(locationManager)
                 .environmentObject(rideRecorder)
                 .environmentObject(weatherManager)
+                .environmentObject(workoutManager)
         }
         .modelContainer(sharedModelContainer)
     }
