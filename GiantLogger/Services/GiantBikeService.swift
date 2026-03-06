@@ -23,6 +23,12 @@ class GiantBikeService: ObservableObject {
     private let debugLog = DebugLogger.shared
     private var packetBuffer: [String] = []
 
+    init() {
+        // Restore last known battery % so dashboard shows it when not connected
+        let saved = UserDefaults.standard.integer(forKey: "lastBatteryPercent")
+        if saved > 0 { rideData.batteryPercent = saved }
+    }
+
     func getAndClearPacketBuffer() -> String {
         let log = packetBuffer.joined(separator: "\n")
         packetBuffer.removeAll()
@@ -310,6 +316,7 @@ class GiantBikeService: ObservableObject {
             return
         }
         rideData.batteryPercent = batteryData.capacityPercent
+        UserDefaults.standard.set(batteryData.capacityPercent, forKey: "lastBatteryPercent")
         logger.debug(
             "Parsed battery data: capacity=\(batteryData.capacityPercent) life=\(batteryData.lifePercent)"
         )
