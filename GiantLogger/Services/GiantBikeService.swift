@@ -21,6 +21,8 @@ class GiantBikeService: ObservableObject {
     private var connectGEVAcked = false
     private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "GEV")
     private let debugLog = DebugLogger.shared
+    private var rangeTxCount = 0
+    private var rangeRxCount = 0
     private var packetBuffer: [String] = []
 
     init() {
@@ -91,6 +93,8 @@ class GiantBikeService: ObservableObject {
 
     func requestRemainingRange() {
         let data = GiantProtocol.readBikeDataRideControlCommand()
+        rangeTxCount += 1
+        debugLog.log("GEV", "TX range cmd=0x11 (#\(rangeTxCount), rxCount=\(rangeRxCount))")
         logTX(data)
         bikeManager?.write(data)
     }
@@ -289,11 +293,23 @@ class GiantBikeService: ObservableObject {
     }
 
     private func handleRemainingRange(_ plaintext: [UInt8]) {
-        guard let rangeData = GiantProtocol.parseRemainingRange(plaintext) else { return }
+        rangeRxCount += 1
+        let rawBytes = plaintext.map { String(format: "%02X", $0) }.joined()
+        debugLog.log("GEV", "RX range raw=\(rawBytes) (#\(rangeRxCount)/\(rangeTxCount) TX)")
+        guard let rangeData = GiantProtocol.parseRemainingRange(plaintext) else {
+            debugLog.log("GEV", "WARN: range parse failed")
+            return
+        }
+        // Bike sends 2 responses per request: first has real data, second is all zeros.
+        // Only accept responses with at least one non-zero mode.
+        guard !rangeData.nonZeroModes.isEmpty else {
+            debugLog.log("GEV", "Range: all zeros — ignoring (kept previous)")
+            return
+        }
         rideData.rangeData = rangeData
-        let modes = rangeData.nonZeroModes.map { "\($0.label)=\($0.range)km" }.joined(separator: " ")
-        logger.debug("Range: \(modes, privacy: .public)")
-        debugLog.log("GEV", "Range: \(modes)")
+        let all = "eco=\(rangeData.eco) norm=\(rangeData.normal) pwr=\(rangeData.power) boost=\(rangeData.boost) smart=\(rangeData.smart)"
+        logger.debug("Range: \(all, privacy: .public)")
+        debugLog.log("GEV", "Range: \(all)")
     }
 
     private func handleReadFactoryData(_ plaintext: [UInt8]) {
