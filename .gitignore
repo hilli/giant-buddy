@@ -28,5 +28,8 @@ Package.resolved
 # CocoaPods
 Pods/
 
+# Secrets
+StravaSecrets.swift
+
 # macOS
 .DS_Store

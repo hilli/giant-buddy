@@ -25,6 +25,7 @@ class RideRecorder: ObservableObject {
     private var bikeService: GiantBikeService?
     private var locationManager: LocationManager?
     private var workoutManager: WorkoutManager?
+    private var stravaService: StravaService?
     private var modelContext: ModelContext?
     private var recordingTask: Task<Void, Never>?
     private var durationTask: Task<Void, Never>?
@@ -38,10 +39,12 @@ class RideRecorder: ObservableObject {
     }
 
     func configure(bikeService: GiantBikeService, locationManager: LocationManager,
-                   workoutManager: WorkoutManager, modelContext: ModelContext) {
+                   workoutManager: WorkoutManager, stravaService: StravaService,
+                   modelContext: ModelContext) {
         self.bikeService = bikeService
         self.locationManager = locationManager
         self.workoutManager = workoutManager
+        self.stravaService = stravaService
         self.modelContext = modelContext
 
         // Auto-start recording when GEV connects; always stop on disconnect
@@ -113,6 +116,14 @@ class RideRecorder: ObservableObject {
                         avgPower: ride.avgPower,
                         duration: TimeInterval(ride.duration)
                     )
+                }
+
+                // Auto-upload to Strava if enabled
+                if let strava = stravaService, strava.isConnected && strava.autoUpload {
+                    let rideToUpload = ride
+                    Task {
+                        try? await strava.uploadRide(rideToUpload)
+                    }
                 }
             }
         }

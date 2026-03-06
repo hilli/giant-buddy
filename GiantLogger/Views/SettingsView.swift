@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var bikeManager: BikeManager
     @EnvironmentObject var rideRecorder: RideRecorder
     @EnvironmentObject var workoutManager: WorkoutManager
+    @EnvironmentObject var stravaService: StravaService
 
     @AppStorage("autoRecord") private var autoRecord = true
     @AppStorage("recordingInterval") private var recordingInterval = 2.0
@@ -83,6 +84,8 @@ struct SettingsView: View {
                     Text("When auto-connect is enabled, the app will automatically connect to your saved bike when it's in range.")
                 }
 
+                stravaSection
+
                 debugLogSection
 
                 Section {
@@ -114,6 +117,59 @@ struct SettingsView: View {
             .onAppear { refreshLogSize() }
             .sheet(isPresented: $showingShareSheet) {
                 ShareSheet(items: [DebugLogger.shared.logFileURL])
+            }
+        }
+    }
+
+    private var stravaSection: some View {
+        Section {
+            if stravaService.isConnected {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    VStack(alignment: .leading) {
+                        Text("Connected")
+                            .font(.body)
+                        if let name = stravaService.athleteName {
+                            Text(name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                }
+
+                Toggle("Auto-Upload Rides", isOn: Binding(
+                    get: { stravaService.autoUpload },
+                    set: { stravaService.autoUpload = $0 }
+                ))
+
+                Button("Disconnect from Strava", role: .destructive) {
+                    stravaService.disconnect()
+                }
+            } else {
+                Button {
+                    stravaService.authenticate()
+                } label: {
+                    HStack {
+                        Image(systemName: "link")
+                        Text("Connect to Strava")
+                    }
+                }
+            }
+
+            if let error = stravaService.lastUploadError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        } header: {
+            Text("Strava")
+        } footer: {
+            if stravaService.isConnected {
+                Text("When auto-upload is enabled, rides are uploaded to Strava as e-bike rides when recording stops.")
+            } else {
+                Text("Connect your Strava account to upload rides.")
             }
         }
     }

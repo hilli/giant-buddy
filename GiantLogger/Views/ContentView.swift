@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var rideRecorder: RideRecorder
     @EnvironmentObject var workoutManager: WorkoutManager
+    @EnvironmentObject var stravaService: StravaService
     @Environment(\.modelContext) private var modelContext
 
     @State private var hasConfigured = false
@@ -41,6 +42,7 @@ struct ContentView: View {
                     bikeService: bikeService,
                     locationManager: locationManager,
                     workoutManager: workoutManager,
+                    stravaService: stravaService,
                     modelContext: modelContext
                 )
                 if UserDefaults.standard.bool(forKey: "logWorkouts") {

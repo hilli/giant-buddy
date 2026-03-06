@@ -4,7 +4,9 @@ import Charts
 
 struct RideDetailView: View {
     let ride: Ride
+    @EnvironmentObject var stravaService: StravaService
     @State private var exportURL: IdentifiableURL?
+    @State private var stravaUploadSuccess = false
 
     private var sortedSamples: [RideSample] {
         (ride.samples ?? []).sorted { $0.timestamp < $1.timestamp }
@@ -52,6 +54,26 @@ struct RideDetailView: View {
                     } label: {
                         Label("Export GPX", systemImage: "map")
                     }
+                    if stravaService.isConnected {
+                        Divider()
+                        Button {
+                            Task {
+                                do {
+                                    try await stravaService.uploadRide(ride)
+                                    stravaUploadSuccess = true
+                                } catch {
+                                    stravaService.lastUploadError = error.localizedDescription
+                                }
+                            }
+                        } label: {
+                            if stravaService.isUploading {
+                                Label("Uploading…", systemImage: "arrow.up.circle")
+                            } else {
+                                Label("Upload to Strava", systemImage: "arrow.up.circle.fill")
+                            }
+                        }
+                        .disabled(stravaService.isUploading)
+                    }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
@@ -59,6 +81,11 @@ struct RideDetailView: View {
         }
         .sheet(item: $exportURL) { item in
             ShareSheet(items: [item.url])
+        }
+        .alert("Uploaded to Strava", isPresented: $stravaUploadSuccess) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your ride has been uploaded to Strava.")
         }
     }
 
