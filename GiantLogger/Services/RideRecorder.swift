@@ -102,7 +102,7 @@ class RideRecorder: ObservableObject {
         // Discard rides where user hasn't moved (< 10m) or has no samples
         if let ride = currentRide {
             ride.computeSummary()
-            if ride.samples.isEmpty || accumulatedDistance < 0.01 {
+            if (ride.samples ?? []).isEmpty || accumulatedDistance < 0.01 {
                 modelContext?.delete(ride)
             } else {
                 // Save workout to HealthKit if enabled
@@ -169,7 +169,8 @@ class RideRecorder: ObservableObject {
         )
         sample.ride = currentRide
         sample.packetLog = bikeService.getAndClearPacketBuffer()
-        currentRide.samples.append(sample)
+        if currentRide.samples == nil { currentRide.samples = [] }
+        currentRide.samples?.append(sample)
         modelContext.insert(sample)
         sampleCount += 1
 

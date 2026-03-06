@@ -7,7 +7,7 @@ struct RideDetailView: View {
     @State private var exportURL: IdentifiableURL?
 
     private var sortedSamples: [RideSample] {
-        ride.samples.sorted { $0.timestamp < $1.timestamp }
+        (ride.samples ?? []).sorted { $0.timestamp < $1.timestamp }
     }
 
     private var gpsCoordinates: [CLLocationCoordinate2D] {

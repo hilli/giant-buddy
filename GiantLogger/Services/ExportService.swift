@@ -11,7 +11,7 @@ enum ExportService {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
 
-        let rows = ride.samples.sorted { $0.timestamp < $1.timestamp }.map { s in
+        let rows = (ride.samples ?? []).sorted { $0.timestamp < $1.timestamp }.map { s in
             [
                 formatter.string(from: s.timestamp),
                 String(format: "%.1f", s.speed),
@@ -59,7 +59,7 @@ enum ExportService {
             <trkseg>
         """
 
-        for sample in ride.samples.sorted(by: { $0.timestamp < $1.timestamp }) {
+        for sample in (ride.samples ?? []).sorted(by: { $0.timestamp < $1.timestamp }) {
             guard sample.latitude != 0 || sample.longitude != 0 else { continue }
             gpx += """
 

@@ -23,7 +23,7 @@ final class Ride {
     var endBattery: Int = 0           // %
 
     @Relationship(deleteRule: .cascade, inverse: \RideSample.ride)
-    var samples: [RideSample] = []
+    var samples: [RideSample]? = []
 
     init(startDate: Date = .now) {
         self.id = UUID()
@@ -31,8 +31,9 @@ final class Ride {
     }
 
     func computeSummary() {
-        guard !samples.isEmpty else { return }
-        let sorted = samples.sorted { $0.timestamp < $1.timestamp }
+        let allSamples = samples ?? []
+        guard !allSamples.isEmpty else { return }
+        let sorted = allSamples.sorted { $0.timestamp < $1.timestamp }
 
         endDate = sorted.last?.timestamp
         duration = Int((endDate ?? startDate).timeIntervalSince(startDate))
