@@ -23,6 +23,10 @@ struct RideListView: View {
                         }
                         .onDelete(perform: deleteRides)
                     }
+                    .refreshable {
+                        // @Query auto-updates from CloudKit; brief pause for visual feedback
+                        try? await Task.sleep(for: .milliseconds(500))
+                    }
                 }
             }
             .navigationTitle("Ride History")
