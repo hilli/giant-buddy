@@ -3,8 +3,8 @@ import SwiftData
 
 @Model
 final class Ride {
-    var id: UUID
-    var startDate: Date
+    var id: UUID = UUID()
+    var startDate: Date = Date.now
     var endDate: Date?
 
     // Summary stats (computed on stop)
@@ -71,7 +71,7 @@ final class Ride {
 
 @Model
 final class RideSample {
-    var timestamp: Date
+    var timestamp: Date = Date.now
     var ride: Ride?
 
     // Bike telemetry
