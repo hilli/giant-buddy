@@ -111,7 +111,8 @@ class BikeManager: NSObject, ObservableObject {
         }
         logger.debug("TX \(data.count) bytes: \(data.hexString, privacy: .public)")
         debugLog.log("BLE", "TX \(data.count)B: \(data.hexString)")
-        peripheral.writeValue(data, for: characteristic, type: .withResponse)
+        // Android APK uses WRITE_TYPE_NO_RESPONSE (setWriteType(1)) for all GEV writes
+        peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
     }
 
     /// Write without waiting for a BLE-level ACK (matches Android WRITE_TYPE_NO_RESPONSE).
