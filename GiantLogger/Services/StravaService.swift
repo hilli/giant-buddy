@@ -19,7 +19,7 @@ class StravaService: NSObject, ObservableObject {
     }
 
     private let callbackScheme = "giantlogger"
-    private let redirectURI = "giantlogger://strava"
+    private let redirectURI = "giantlogger://localhost"
     private var authSession: ASWebAuthenticationSession?
 
     private override init() {
