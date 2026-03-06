@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var showingShareSheet = false
     @State private var logSize = 0
 
+    @State private var debugLogEnabled = DebugLogger.shared.isEnabled
+
     var body: some View {
         NavigationStack {
             Form {
@@ -83,31 +85,17 @@ struct SettingsView: View {
 
                 debugLogSection
 
-                if logWorkouts {
-                    Section {
-                        Button {
-                            workoutManager.requestAuthorization()
-                        } label: {
-                            Label("Re-request HealthKit Permissions", systemImage: "heart.text.square")
-                        }
-
-                        Button {
-                            workoutManager.injectSampleWorkout()
-                        } label: {
-                            Label("Inject Sample Workout", systemImage: "plus.circle")
-                        }
-                    } header: {
-                        Text("HealthKit Debug")
-                    } footer: {
-                        Text("Inject creates a fake 10-min / 5 km cycling workout in Apple Health to verify the pipeline works.")
-                    }
-                }
-
                 Section {
                     HStack {
                         Text("Version")
                         Spacer()
                         Text("1.0.0")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Author")
+                        Spacer()
+                        Text("Jens Hilligsøe")
                             .foregroundStyle(.secondary)
                     }
                     Link(destination: URL(string: "https://github.com/hilli/giant-logger-ios")!) {
@@ -132,29 +120,36 @@ struct SettingsView: View {
 
     private var debugLogSection: some View {
         Section {
-            HStack {
-                Text("Log Size")
-                Spacer()
-                Text(formattedLogSize)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-
-            Button {
-                showingShareSheet = true
-            } label: {
-                HStack {
-                    Image(systemName: "square.and.arrow.up")
-                    Text("Export Debug Log")
+            Toggle("Enable Debug Log", isOn: $debugLogEnabled)
+                .onChange(of: debugLogEnabled) { _, newValue in
+                    DebugLogger.shared.isEnabled = newValue
                 }
-            }
-            .disabled(logSize == 0)
 
-            Button("Clear Log", role: .destructive) {
-                DebugLogger.shared.clearLog()
-                refreshLogSize()
+            if debugLogEnabled {
+                HStack {
+                    Text("Log Size")
+                    Spacer()
+                    Text(formattedLogSize)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                Button {
+                    showingShareSheet = true
+                } label: {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("Export Debug Log")
+                    }
+                }
+                .disabled(logSize == 0)
+
+                Button("Clear Log", role: .destructive) {
+                    DebugLogger.shared.clearLog()
+                    refreshLogSize()
+                }
+                .disabled(logSize == 0)
             }
-            .disabled(logSize == 0)
         } header: {
             Text("Debug Log")
         } footer: {

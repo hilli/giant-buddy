@@ -14,6 +14,12 @@ final class DebugLogger {
         return fmt
     }()
 
+    /// Whether debug logging is active (persisted in UserDefaults)
+    var isEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "debugLogEnabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "debugLogEnabled") }
+    }
+
     private init() {
         let docs = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask
@@ -21,8 +27,9 @@ final class DebugLogger {
         fileURL = docs.appendingPathComponent("giant-debug.log")
     }
 
-    /// Append a timestamped log line.
+    /// Append a timestamped log line (no-op when disabled).
     func log(_ category: String, _ message: String) {
+        guard isEnabled else { return }
         let timestamp = dateFormatter.string(from: Date())
         let line = "[\(timestamp)] [\(category)] \(message)\n"
         queue.async { [fileURL] in
