@@ -278,6 +278,7 @@ enum GiantProtocol {
     static func parseRCVersion(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.passiveRC1.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 8 else { return }
         let fwYear = Int(b[2] & 0x1F) + 2000
         let fwMonth = Int(b[1] & 0x1F)
         let fwDay = Int(b[0] & 0x1F)
@@ -293,6 +294,7 @@ enum GiantProtocol {
     static func parseModeUsage(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.passiveRC2.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 13 else { return }
         info.modeUsage = ModeUsageData(
             smart: Int(b[0]), boostPlus: Int(b[1]), boost: Int(b[2]),
             powerPlus: Int(b[3]), power: Int(b[4]), climbPlus: Int(b[5]),
@@ -316,6 +318,7 @@ enum GiantProtocol {
     static func parseMotorInfo(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.passiveSD1.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 13 else { return }
         // FW: 3 ASCII chars + 1 char + 3 hex bytes + 1 ASCII char
         let fw1 = String(UnicodeScalar(b[0]))
         let fw2 = String(UnicodeScalar(b[1]))
@@ -335,14 +338,17 @@ enum GiantProtocol {
         }
         // HW: 5 ASCII chars
         info.motorHwVersion = (8...12).map { String(UnicodeScalar(b[$0])) }.joined()
-        // PSN: 3-byte little-endian int
-        info.motorPSN = Int(b[15]) | (Int(b[16]) << 8) | (Int(b[17]) << 16)
+        // PSN: only available if response has enough data (may need multi-packet)
+        if b.count > 17 {
+            info.motorPSN = Int(b[15]) | (Int(b[16]) << 8) | (Int(b[17]) << 16)
+        }
     }
 
     /// Parse service + avg amps (cmd 0x0A, PASSIVE_DATA_SYNC_DRIVE_2)
     static func parseServiceData(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.passiveSD2.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 14 else { return }
         info.serviceToolConnections = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
         info.lastServiceHoursAgo = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
         info.lastServiceKmAgo = Int(littleEndianUInt16([b[4], b[5]], offset: 0))
@@ -374,6 +380,7 @@ enum GiantProtocol {
     static func parseEPVersion(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.passiveEP1.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 7 else { return }
         let typeHex = String(format: "%02x", b[0])
         let mfg = b[1] == 0 ? "PF" : "GA"
         let year = Int(b[2]) + 2000
@@ -387,6 +394,7 @@ enum GiantProtocol {
     static func parseEPChargeCycles(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.passiveEP2.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 5 else { return }
         info.epChargeCycles = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
         info.epChargeTimes = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
         info.epDischargePercent = Int(b[4])
@@ -402,6 +410,7 @@ enum GiantProtocol {
     static func parseEPCapacity(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.passiveEP4.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 6 else { return }
         info.epMaxNotChargedDays = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
         info.epNotChargedCycles = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
         info.epCapacityWh = Double(Int16(bitPattern: littleEndianUInt16([b[4], b[5]], offset: 0))) / 10.0
@@ -411,6 +420,7 @@ enum GiantProtocol {
     static func parseODO(_ plain: [UInt8], into info: inout BikeInfo) {
         guard plain[0] == Command.activeSyncDrive.rawValue else { return }
         let b = Array(plain[2...])
+        guard b.count >= 4 else { return }
         info.odo = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
         info.totalUsageHours = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
     }
