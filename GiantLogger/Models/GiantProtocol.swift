@@ -18,8 +18,21 @@ enum GiantProtocol {
     enum Command: UInt8 {
         case connectGEV          = 0x02
         case readFactoryData     = 0x03
+        case passiveRC1          = 0x05  // PASSIVE_DATA_RIDE_CONTROL_1 — RC FW/HW version
+        case passiveRC2          = 0x06  // PASSIVE_DATA_RIDE_CONTROL_2 — mode usage %
+        case passiveRC3          = 0x07  // PASSIVE_DATA_RIDE_CONTROL_3 — RC error code
+        case passiveRC4          = 0x08  // PASSIVE_DATA_RIDE_CONTROL_4 — RC node2 error code
+        case passiveSD1          = 0x09  // PASSIVE_DATA_SYNC_DRIVE_1 — motor FW/HW/type/PSN
+        case passiveSD2          = 0x0A  // PASSIVE_DATA_SYNC_DRIVE_2 — service + avg amps
+        case passiveSD3          = 0x0B  // PASSIVE_DATA_SYNC_DRIVE_3 — motor error code 1
+        case passiveSD4          = 0x0C  // PASSIVE_DATA_SYNC_DRIVE_4 — motor error code 2
+        case passiveEP1          = 0x0D  // PASSIVE_DATA_ENERGY_PAK_1 — EP version
+        case passiveEP2          = 0x0E  // PASSIVE_DATA_ENERGY_PAK_2 — EP charge cycles
+        case passiveEP3          = 0x0F  // PASSIVE_DATA_ENERGY_PAK_3 — EP error code
+        case passiveEP4          = 0x10  // PASSIVE_DATA_ENERGY_PAK_4 — EP capacity + dnc
         case bikeDataRideControl = 0x11  // ACTIVE_DATA_RIDE_CONTROL_1 — range per assist mode
-        case readBattery         = 0x13
+        case activeSyncDrive     = 0x12  // ACTIVE_DATA_SYNC_DRIVE_1 — ODO + total hours
+        case readBattery         = 0x13  // ACTIVE_DATA_ENERGY_PAK_1 — battery %/life/capacity
         case diagnosticSyncDrive = 0x16
         case diagnosticEnergyPak = 0x17
         case readRidingData      = 0x1B
@@ -111,6 +124,19 @@ enum GiantProtocol {
     static func readBikeDataRideControlCommand() -> Data {
         buildPacket(command: .bikeDataRideControl)
     }
+
+    /// Build command for any readSingleBikeData request (commands 0x05-0x13)
+    static func readSingleBikeDataCommand(_ command: Command) -> Data {
+        buildPacket(command: command)
+    }
+
+    /// All passive/active bike data commands to fetch full bike info
+    static let allBikeDataCommands: [Command] = [
+        .passiveRC1, .passiveRC2, .passiveRC3, .passiveRC4,
+        .passiveSD1, .passiveSD2, .passiveSD3, .passiveSD4,
+        .passiveEP1, .passiveEP2, .passiveEP3, .passiveEP4,
+        .bikeDataRideControl, .activeSyncDrive, .readBattery,
+    ]
 
     static func diagnosticEnergyPakCommand() -> Data {
         buildPacket(command: .diagnosticEnergyPak)
@@ -244,6 +270,157 @@ enum GiantProtocol {
             alarm: Int(plain[3]),
             underVoltageAlarm: (plain[3] & 50) >= 1
         )
+    }
+
+    // MARK: - BikeInfo Parsers (readSingleBikeData responses)
+
+    /// Parse RC FW/HW version (cmd 0x05, PASSIVE_DATA_RIDE_CONTROL_1)
+    static func parseRCVersion(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveRC1.rawValue else { return }
+        let b = Array(plain[2...])
+        let fwYear = Int(b[2] & 0x1F) + 2000
+        let fwMonth = Int(b[1] & 0x1F)
+        let fwDay = Int(b[0] & 0x1F)
+        let fwBuild = Int(b[3] & 0x1F)
+        info.rcFwVersion = String(format: "%04d%02d%02d%03d", fwYear, fwMonth, fwDay, fwBuild)
+        let hwYear = Int(b[5] & 0x1F) + 2000
+        let hwMonth = Int(b[4] & 0x0F)
+        let hwSerial = Int(littleEndianUInt16([b[6], b[7]], offset: 0))
+        info.rcHwVersion = String(format: "%04d%02d%05d", hwYear, hwMonth, hwSerial)
+    }
+
+    /// Parse mode usage percentages (cmd 0x06, PASSIVE_DATA_RIDE_CONTROL_2)
+    static func parseModeUsage(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveRC2.rawValue else { return }
+        let b = Array(plain[2...])
+        info.modeUsage = ModeUsageData(
+            smart: Int(b[0]), boostPlus: Int(b[1]), boost: Int(b[2]),
+            powerPlus: Int(b[3]), power: Int(b[4]), climbPlus: Int(b[5]),
+            climb: Int(b[6]), normalPlus: Int(b[7]), normal: Int(b[8]),
+            tourPlus: Int(b[9]), tour: Int(b[10]), eco: Int(b[11]),
+            off: Int(b[12])
+        )
+    }
+
+    /// Parse RC error codes (cmd 0x07, 0x08)
+    static func parseRCErrorCode(_ plain: [UInt8], into info: inout BikeInfo) {
+        let hex = plain[2...].map { String(format: "%02X", $0) }.joined()
+        if plain[0] == Command.passiveRC3.rawValue {
+            info.rcErrorCode = hex
+        } else if plain[0] == Command.passiveRC4.rawValue {
+            info.rcNode2ErrorCode = hex
+        }
+    }
+
+    /// Parse motor FW/HW version, type, PSN (cmd 0x09, PASSIVE_DATA_SYNC_DRIVE_1)
+    static func parseMotorInfo(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveSD1.rawValue else { return }
+        let b = Array(plain[2...])
+        // FW: 3 ASCII chars + 1 char + 3 hex bytes + 1 ASCII char
+        let fw1 = String(UnicodeScalar(b[0]))
+        let fw2 = String(UnicodeScalar(b[1]))
+        let fw3 = String(UnicodeScalar(b[2]))
+        let fw4 = String(UnicodeScalar(plain[5]))
+        let fwHex = b[4...6].map { String(format: "%02x", $0) }.joined()
+        let fw8 = String(UnicodeScalar(b[7]))
+        info.motorFwVersion = fw1 + fw2 + fw3 + fw4 + fwHex + fw8
+        // Determine motor type from FW version prefix
+        let prefix = String(info.motorFwVersion.prefix(3)).uppercased()
+        switch prefix {
+        case "S00", "S01": info.motorType = "SyncDrive Pro"
+        case "S10", "S11": info.motorType = "SyncDrive Sport"
+        case "S20", "S21": info.motorType = "SyncDrive Core"
+        case "S30", "S31": info.motorType = "SyncDrive Life"
+        default: info.motorType = "SyncDrive (\(prefix))"
+        }
+        // HW: 5 ASCII chars
+        info.motorHwVersion = (8...12).map { String(UnicodeScalar(b[$0])) }.joined()
+        // PSN: 3-byte little-endian int
+        info.motorPSN = Int(b[15]) | (Int(b[16]) << 8) | (Int(b[17]) << 16)
+    }
+
+    /// Parse service + avg amps (cmd 0x0A, PASSIVE_DATA_SYNC_DRIVE_2)
+    static func parseServiceData(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveSD2.rawValue else { return }
+        let b = Array(plain[2...])
+        info.serviceToolConnections = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
+        info.lastServiceHoursAgo = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
+        info.lastServiceKmAgo = Int(littleEndianUInt16([b[4], b[5]], offset: 0))
+        info.avgAmpsBoost = Double(Int16(bitPattern: littleEndianUInt16([b[6], b[7]], offset: 0))) / 100.0
+        info.avgAmpsPower = Double(Int16(bitPattern: littleEndianUInt16([b[8], b[9]], offset: 0))) / 100.0
+        info.avgAmpsClimb = Double(Int16(bitPattern: littleEndianUInt16([b[10], b[11]], offset: 0))) / 100.0
+        info.avgAmpsNormal = Double(Int16(bitPattern: littleEndianUInt16([b[12], b[13]], offset: 0))) / 100.0
+        // Note: tourAvgA and ecoAvgA are at b[14:15] and b[16:17] but we only have 14 bytes of payload
+        // They come through if the response has enough data
+        if b.count > 15 {
+            info.avgAmpsTour = Double(Int16(bitPattern: littleEndianUInt16([b[14], b[15]], offset: 0))) / 100.0
+        }
+        if b.count > 17 {
+            info.avgAmpsEco = Double(Int16(bitPattern: littleEndianUInt16([b[16], b[17]], offset: 0))) / 100.0
+        }
+    }
+
+    /// Parse motor error codes (cmd 0x0B, 0x0C)
+    static func parseMotorErrorCode(_ plain: [UInt8], into info: inout BikeInfo) {
+        let hex = plain[2...].map { String(format: "%02X", $0) }.joined()
+        if plain[0] == Command.passiveSD3.rawValue {
+            info.motorErrorCode1 = hex
+        } else if plain[0] == Command.passiveSD4.rawValue {
+            info.motorErrorCode2 = hex
+        }
+    }
+
+    /// Parse EnergyPak version (cmd 0x0D, PASSIVE_DATA_ENERGY_PAK_1)
+    static func parseEPVersion(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveEP1.rawValue else { return }
+        let b = Array(plain[2...])
+        let typeHex = String(format: "%02x", b[0])
+        let mfg = b[1] == 0 ? "PF" : "GA"
+        let year = Int(b[2]) + 2000
+        let month = Int(b[3])
+        let day = Int(b[4])
+        let serial = Int(littleEndianUInt16([b[5], b[6]], offset: 0))
+        info.epVersion = typeHex + mfg + String(format: "%04d%02d%02d%05d", year, month, day, serial)
+    }
+
+    /// Parse EnergyPak charge cycles (cmd 0x0E, PASSIVE_DATA_ENERGY_PAK_2)
+    static func parseEPChargeCycles(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveEP2.rawValue else { return }
+        let b = Array(plain[2...])
+        info.epChargeCycles = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
+        info.epChargeTimes = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
+        info.epDischargePercent = Int(b[4])
+    }
+
+    /// Parse EnergyPak error code (cmd 0x0F, PASSIVE_DATA_ENERGY_PAK_3)
+    static func parseEPErrorCode(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveEP3.rawValue else { return }
+        info.epErrorCode = plain[2...].map { String(format: "%02X", $0) }.joined()
+    }
+
+    /// Parse EnergyPak capacity details (cmd 0x10, PASSIVE_DATA_ENERGY_PAK_4)
+    static func parseEPCapacity(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.passiveEP4.rawValue else { return }
+        let b = Array(plain[2...])
+        info.epMaxNotChargedDays = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
+        info.epNotChargedCycles = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
+        info.epCapacityWh = Double(Int16(bitPattern: littleEndianUInt16([b[4], b[5]], offset: 0))) / 10.0
+    }
+
+    /// Parse ODO + total usage hours (cmd 0x12, ACTIVE_DATA_SYNC_DRIVE_1)
+    static func parseODO(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.activeSyncDrive.rawValue else { return }
+        let b = Array(plain[2...])
+        info.odo = Int(littleEndianUInt16([b[0], b[1]], offset: 0))
+        info.totalUsageHours = Int(littleEndianUInt16([b[2], b[3]], offset: 0))
+    }
+
+    /// Parse battery capacity/life/fullCapacity (cmd 0x13) into BikeInfo
+    static func parseBatteryIntoBikeInfo(_ plain: [UInt8], into info: inout BikeInfo) {
+        guard plain[0] == Command.readBattery.rawValue else { return }
+        info.epCapacityPercent = Int(plain[2])
+        info.epLifePercent = Int(plain[3])
+        info.epLastFullCapacityWh = Double(littleEndianUInt16(plain, offset: 4)) / 10.0
     }
 
     // MARK: - AES Helpers
@@ -385,6 +562,97 @@ struct RemainingRangeData: Equatable {
             ("Boost", boost), ("Boost+", boostPlus),
             ("Climb", climb), ("Climb+", climbPlus),
             ("Smart", smart),
+        ]
+        return all.filter { $0.1 > 0 }
+    }
+}
+
+// MARK: - BikeInfo (cached bike data from readSingleBikeData commands 0x05-0x13)
+
+struct BikeInfo: Codable, Equatable {
+    // Overview (0x12)
+    var odo: Int = 0
+    var totalUsageHours: Int = 0
+
+    // Ride Control (0x05)
+    var rcFwVersion: String = ""
+    var rcHwVersion: String = ""
+
+    // Ride Control errors (0x07, 0x08)
+    var rcErrorCode: String = ""
+    var rcNode2ErrorCode: String = ""
+
+    // Motor / SyncDrive (0x09)
+    var motorFwVersion: String = ""
+    var motorHwVersion: String = ""
+    var motorType: String = ""
+    var motorPSN: Int = 0
+
+    // Motor errors (0x0B, 0x0C)
+    var motorErrorCode1: String = ""
+    var motorErrorCode2: String = ""
+
+    // Service (0x0A)
+    var serviceToolConnections: Int = 0
+    var lastServiceHoursAgo: Int = 0
+    var lastServiceKmAgo: Int = 0
+    var avgAmpsBoost: Double = 0
+    var avgAmpsPower: Double = 0
+    var avgAmpsClimb: Double = 0
+    var avgAmpsNormal: Double = 0
+    var avgAmpsTour: Double = 0
+    var avgAmpsEco: Double = 0
+
+    // EnergyPak version (0x0D)
+    var epVersion: String = ""
+
+    // EnergyPak charge info (0x0E)
+    var epChargeCycles: Int = 0
+    var epChargeTimes: Int = 0
+    var epDischargePercent: Int = 0
+
+    // EnergyPak error (0x0F)
+    var epErrorCode: String = ""
+
+    // EnergyPak capacity (0x10)
+    var epMaxNotChargedDays: Int = 0
+    var epNotChargedCycles: Int = 0
+    var epCapacityWh: Double = 0
+
+    // Battery from ACTIVE_DATA_ENERGY_PAK_1 (0x13)
+    var epCapacityPercent: Int = 0
+    var epLifePercent: Int = 0
+    var epLastFullCapacityWh: Double = 0
+
+    // Mode usage % (0x06)
+    var modeUsage: ModeUsageData = ModeUsageData()
+
+    var lastUpdated: Date?
+}
+
+struct ModeUsageData: Codable, Equatable {
+    var smart: Int = 0
+    var boostPlus: Int = 0
+    var boost: Int = 0
+    var powerPlus: Int = 0
+    var power: Int = 0
+    var climbPlus: Int = 0
+    var climb: Int = 0
+    var normalPlus: Int = 0
+    var normal: Int = 0
+    var tourPlus: Int = 0
+    var tour: Int = 0
+    var eco: Int = 0
+    var off: Int = 0
+
+    var nonZeroModes: [(label: String, pct: Int)] {
+        let all: [(String, Int)] = [
+            ("Eco", eco), ("Normal", normal), ("Normal+", normalPlus),
+            ("Tour", tour), ("Tour+", tourPlus),
+            ("Power", power), ("Power+", powerPlus),
+            ("Boost", boost), ("Boost+", boostPlus),
+            ("Climb", climb), ("Climb+", climbPlus),
+            ("Smart", smart), ("Off", off),
         ]
         return all.filter { $0.1 > 0 }
     }

@@ -12,7 +12,9 @@ class GiantBikeService: ObservableObject {
     @Published var batteryData: BatteryData?
     @Published var syncDriveData: SyncDriveData?
     @Published var energyPakData: EnergyPakData?
+    @Published var bikeInfo: BikeInfo?
     @Published var isGevConnected = false
+    @Published var isFetchingBikeInfo = false
 
     private var bikeManager: BikeManager?
     private var cancellables = Set<AnyCancellable>()
@@ -33,6 +35,17 @@ class GiantBikeService: ObservableObject {
         let savedRange = UserDefaults.standard.integer(forKey: "lastRangeKm")
         if savedRange > 0 {
             rideData.rangeData = RemainingRangeData(eco: savedRange, normal: 0, power: 0, boost: 0, smart: 0)
+        }
+        // Restore cached bike info
+        if let data = UserDefaults.standard.data(forKey: "cachedBikeInfo"),
+           let cached = try? JSONDecoder().decode(BikeInfo.self, from: data) {
+            bikeInfo = cached
+        }
+    }
+
+    private func saveBikeInfo() {
+        if let data = try? JSONEncoder().encode(bikeInfo) {
+            UserDefaults.standard.set(data, forKey: "cachedBikeInfo")
         }
     }
 
@@ -114,6 +127,29 @@ class GiantBikeService: ObservableObject {
         let data = GiantProtocol.diagnosticEnergyPakCommand()
         logTX(data)
         bikeManager?.write(data)
+    }
+
+    /// Fetch all bike data commands (0x05-0x13) sequentially with delays
+    func fetchAllBikeData() {
+        guard isGevConnected else { return }
+        isFetchingBikeInfo = true
+        if bikeInfo == nil { bikeInfo = BikeInfo() }
+
+        Task {
+            for cmd in GiantProtocol.allBikeDataCommands {
+                guard !Task.isCancelled else { break }
+                let data = GiantProtocol.readSingleBikeDataCommand(cmd)
+                let cmdHex = String(format: "0x%02X", cmd.rawValue)
+                debugLog.log("GEV", "TX bikeData cmd=\(cmdHex)")
+                logTX(data)
+                bikeManager?.write(data)
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+            bikeInfo?.lastUpdated = Date()
+            saveBikeInfo()
+            isFetchingBikeInfo = false
+            debugLog.log("GEV", "Bike data fetch complete")
+        }
     }
 
     func toggleLight() {
@@ -201,6 +237,15 @@ class GiantBikeService: ObservableObject {
             guard !Task.isCancelled else { return }
             requestBattery()
 
+            // Fetch full bike info (all passive + active data commands)
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            fetchAllBikeData()
+
+            // Wait for bike data fetch to complete before starting polling
+            try? await Task.sleep(for: .seconds(7))
+            guard !Task.isCancelled else { return }
+
             startPolling()
         }
     }
@@ -268,6 +313,31 @@ class GiantBikeService: ObservableObject {
 
         case GiantProtocol.Command.diagnosticEnergyPak.rawValue:
             handleDiagnosticEnergyPak(plaintext)
+
+        case GiantProtocol.Command.passiveRC1.rawValue:
+            handleBikeInfoResponse(plaintext, label: "RC version")
+        case GiantProtocol.Command.passiveRC2.rawValue:
+            handleBikeInfoResponse(plaintext, label: "Mode usage")
+        case GiantProtocol.Command.passiveRC3.rawValue,
+             GiantProtocol.Command.passiveRC4.rawValue:
+            handleBikeInfoResponse(plaintext, label: "RC error")
+        case GiantProtocol.Command.passiveSD1.rawValue:
+            handleBikeInfoResponse(plaintext, label: "Motor info")
+        case GiantProtocol.Command.passiveSD2.rawValue:
+            handleBikeInfoResponse(plaintext, label: "Service data")
+        case GiantProtocol.Command.passiveSD3.rawValue,
+             GiantProtocol.Command.passiveSD4.rawValue:
+            handleBikeInfoResponse(plaintext, label: "Motor error")
+        case GiantProtocol.Command.passiveEP1.rawValue:
+            handleBikeInfoResponse(plaintext, label: "EP version")
+        case GiantProtocol.Command.passiveEP2.rawValue:
+            handleBikeInfoResponse(plaintext, label: "EP charge")
+        case GiantProtocol.Command.passiveEP3.rawValue:
+            handleBikeInfoResponse(plaintext, label: "EP error")
+        case GiantProtocol.Command.passiveEP4.rawValue:
+            handleBikeInfoResponse(plaintext, label: "EP capacity")
+        case GiantProtocol.Command.activeSyncDrive.rawValue:
+            handleBikeInfoResponse(plaintext, label: "ODO")
 
         default:
             logger.debug("Unhandled command id=0x\(String(commandID, radix: 16), privacy: .public)")
@@ -339,6 +409,11 @@ class GiantBikeService: ObservableObject {
         }
         rideData.batteryPercent = batteryData.capacityPercent
         UserDefaults.standard.set(batteryData.capacityPercent, forKey: "lastBatteryPercent")
+        // Also update bikeInfo battery fields
+        if var info = bikeInfo {
+            GiantProtocol.parseBatteryIntoBikeInfo(plaintext, into: &info)
+            bikeInfo = info
+        }
         logger.debug(
             "Parsed battery data: capacity=\(batteryData.capacityPercent) life=\(batteryData.lifePercent)"
         )
@@ -373,6 +448,46 @@ class GiantBikeService: ObservableObject {
             logger.debug("EnergyPak: ecode=\(ep.errorCode) alarm=\(ep.alarm) uv=\(ep.underVoltageAlarm)")
             debugLog.log("GEV", "EnergyPak: ecode=\(ep.errorCode) alarm=\(ep.alarm) uv=\(ep.underVoltageAlarm)")
         }
+    }
+
+    private func handleBikeInfoResponse(_ plaintext: [UInt8], label: String) {
+        if bikeInfo == nil { bikeInfo = BikeInfo() }
+        guard var info = bikeInfo else { return }
+
+        let cmdID = plaintext[0]
+        switch cmdID {
+        case GiantProtocol.Command.passiveRC1.rawValue:
+            GiantProtocol.parseRCVersion(plaintext, into: &info)
+        case GiantProtocol.Command.passiveRC2.rawValue:
+            GiantProtocol.parseModeUsage(plaintext, into: &info)
+        case GiantProtocol.Command.passiveRC3.rawValue,
+             GiantProtocol.Command.passiveRC4.rawValue:
+            GiantProtocol.parseRCErrorCode(plaintext, into: &info)
+        case GiantProtocol.Command.passiveSD1.rawValue:
+            GiantProtocol.parseMotorInfo(plaintext, into: &info)
+        case GiantProtocol.Command.passiveSD2.rawValue:
+            GiantProtocol.parseServiceData(plaintext, into: &info)
+        case GiantProtocol.Command.passiveSD3.rawValue,
+             GiantProtocol.Command.passiveSD4.rawValue:
+            GiantProtocol.parseMotorErrorCode(plaintext, into: &info)
+        case GiantProtocol.Command.passiveEP1.rawValue:
+            GiantProtocol.parseEPVersion(plaintext, into: &info)
+        case GiantProtocol.Command.passiveEP2.rawValue:
+            GiantProtocol.parseEPChargeCycles(plaintext, into: &info)
+        case GiantProtocol.Command.passiveEP3.rawValue:
+            GiantProtocol.parseEPErrorCode(plaintext, into: &info)
+        case GiantProtocol.Command.passiveEP4.rawValue:
+            GiantProtocol.parseEPCapacity(plaintext, into: &info)
+        case GiantProtocol.Command.activeSyncDrive.rawValue:
+            GiantProtocol.parseODO(plaintext, into: &info)
+        case GiantProtocol.Command.readBattery.rawValue:
+            GiantProtocol.parseBatteryIntoBikeInfo(plaintext, into: &info)
+        default:
+            break
+        }
+
+        bikeInfo = info
+        debugLog.log("GEV", "BikeInfo: \(label) parsed")
     }
 
     private func logTX(_ data: Data) {

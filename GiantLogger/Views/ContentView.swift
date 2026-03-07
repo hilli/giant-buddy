@@ -16,7 +16,7 @@ struct ContentView: View {
         TabView {
             DashboardView()
                 .tabItem {
-                    Label("Ride", systemImage: "bicycle")
+                    Label("Ride", systemImage: "figure.outdoor.cycle")
                 }
 
             RideListView()
@@ -26,7 +26,7 @@ struct ContentView: View {
 
             ConnectionView()
                 .tabItem {
-                    Label("Connect", systemImage: "antenna.radiowaves.left.and.right")
+                    Label("Bike", systemImage: "bicycle")
                 }
 
             SettingsView()
