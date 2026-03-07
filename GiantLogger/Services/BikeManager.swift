@@ -111,8 +111,10 @@ class BikeManager: NSObject, ObservableObject {
         }
         logger.debug("TX \(data.count) bytes: \(data.hexString, privacy: .public)")
         debugLog.log("BLE", "TX \(data.count)B: \(data.hexString)")
-        // Android APK uses WRITE_TYPE_NO_RESPONSE (setWriteType(1)) for all GEV writes
-        peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
+        // Use .withResponse for proper flow control — CoreBluetooth serializes
+        // writes and won't send the next one until the BLE controller ACKs.
+        // Android achieves the same via readWriteWaiter.waitOne().
+        peripheral.writeValue(data, for: characteristic, type: .withResponse)
     }
 
     /// Write without waiting for a BLE-level ACK (matches Android WRITE_TYPE_NO_RESPONSE).
@@ -126,7 +128,7 @@ class BikeManager: NSObject, ObservableObject {
         }
         logger.debug("TX (no-resp) \(data.count) bytes: \(data.hexString, privacy: .public)")
         debugLog.log("BLE", "TX (no-resp) \(data.count)B: \(data.hexString)")
-        peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
+        peripheral.writeValue(data, for: characteristic, type: .withResponse)
     }
 
     private func cleanup() {
@@ -253,8 +255,13 @@ extension BikeManager: CBPeripheralDelegate {
             for characteristic in service.characteristics ?? [] {
                 if characteristic.uuid == writeCharUUID {
                     writeCharacteristic = characteristic
-                    logger.debug("Found write characteristic")
-                    debugLog.log("BLE", "Found write characteristic")
+                    let props = characteristic.properties
+                    let propStr = [
+                        props.contains(.write) ? "write" : nil,
+                        props.contains(.writeWithoutResponse) ? "writeNoResp" : nil,
+                    ].compactMap { $0 }.joined(separator: ",")
+                    logger.debug("Found write characteristic (props: \(propStr, privacy: .public))")
+                    debugLog.log("BLE", "Found write characteristic (props: \(propStr))")
                 } else if characteristic.uuid == notifyCharUUID {
                     notifyCharacteristic = characteristic
                     logger.debug("Found notify characteristic; enabling notifications")
