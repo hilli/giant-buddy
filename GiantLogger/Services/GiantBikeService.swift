@@ -43,11 +43,22 @@ class GiantBikeService: ObservableObject {
            let cached = try? JSONDecoder().decode(BikeInfo.self, from: data) {
             bikeInfo = cached
         }
+        // Restore cached factory data
+        if let data = UserDefaults.standard.data(forKey: "cachedFactoryData"),
+           let cached = try? JSONDecoder().decode(FactoryData.self, from: data) {
+            factoryData = cached
+        }
     }
 
     private func saveBikeInfo() {
         if let data = try? JSONEncoder().encode(bikeInfo) {
             UserDefaults.standard.set(data, forKey: "cachedBikeInfo")
+        }
+    }
+
+    private func saveFactoryData() {
+        if let data = try? JSONEncoder().encode(factoryData) {
+            UserDefaults.standard.set(data, forKey: "cachedFactoryData")
         }
     }
 
@@ -398,6 +409,7 @@ class GiantBikeService: ObservableObject {
             factory?.frameNumber = name
         }
         factoryData = factory
+        saveFactoryData()
         if let f = factory {
             debugLog.log("GEV", "Factory: speedLimit=\(f.speedLimitation) circ=\(f.circumference)mm frame=\(f.frameNumber) cat=\(f.evCategory) rcHW=\(f.rcHardwareVersion)")
         }

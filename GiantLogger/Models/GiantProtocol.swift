@@ -505,7 +505,7 @@ struct RideData: Equatable {
     }
 }
 
-struct FactoryData: Equatable {
+struct FactoryData: Equatable, Codable {
     var speedLimitation: Int = 0      // raw value (÷10 for km/h)
     var circumference: Int = 0        // wheel circumference in mm
     var frameNumber: String = ""      // from BLE device name
