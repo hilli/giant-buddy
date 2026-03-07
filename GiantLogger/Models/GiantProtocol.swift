@@ -37,6 +37,7 @@ enum GiantProtocol {
         case diagnosticEnergyPak = 0x17
         case readRidingData      = 0x1B
         case triggerAction       = 0x1C
+        case modeCommand         = 0x1A
         case disconnectGEV       = 0x21
         case readTuningData      = 0x2C
     }
@@ -160,6 +161,31 @@ enum GiantProtocol {
 
     static func triggerPowerCommand() -> Data {
         buildPacket(command: .triggerAction, keyIndex: 3, data: [TriggerAction.power.rawValue, 0x08])
+    }
+
+    // MARK: - Mode Commands
+
+    /// Enter fitness mode (cmd 0x1A, data=0x01, keyIndex=1)
+    /// Android sends this after connectGEV — may be required for triggers to work.
+    static func intoFitnessMode() -> Data {
+        buildPacket(command: .modeCommand, keyIndex: 1, data: [0x01])
+    }
+
+    /// Enter normal mode (cmd 0xA0, data=0x00, keyIndex=0)
+    static func intoNormalMode() -> Data {
+        var plaintext = [UInt8](repeating: 0, count: 16)
+        plaintext[0] = 0xA0
+        plaintext[1] = 0x00
+        // key 0
+        let encrypted = aesEncrypt(plaintext: plaintext, keyIndex: 0)
+        var prelude: [UInt8] = [0xFB, 0x21]
+        prelude.append(contentsOf: encrypted)
+        prelude.append(0x00)
+        let crc = xorCRC(prelude)
+        var packet = Data(capacity: 20)
+        packet.append(contentsOf: prelude)
+        packet.append(crc)
+        return packet
     }
 
     // MARK: - Packet Decoding

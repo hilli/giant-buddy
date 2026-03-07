@@ -224,7 +224,16 @@ class GiantBikeService: ObservableObject {
             }
 
             isGevConnected = true
-            debugLog.log("GEV", "GEV session established — requesting static data")
+            debugLog.log("GEV", "GEV session established — entering fitness mode")
+
+            // Enter fitness mode (required for trigger commands to work)
+            let modeData = GiantProtocol.intoFitnessMode()
+            debugLog.log("GEV", "Sending intoFitnessMode")
+            bikeManager?.write(modeData)
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+
+            debugLog.log("GEV", "Requesting static data")
 
             // Request static info sequentially with delays
             requestFactoryData()

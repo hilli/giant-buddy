@@ -111,10 +111,8 @@ class BikeManager: NSObject, ObservableObject {
         }
         logger.debug("TX \(data.count) bytes: \(data.hexString, privacy: .public)")
         debugLog.log("BLE", "TX \(data.count)B: \(data.hexString)")
-        // Use .withResponse for proper flow control — CoreBluetooth serializes
-        // writes and won't send the next one until the BLE controller ACKs.
-        // Android achieves the same via readWriteWaiter.waitOne().
-        peripheral.writeValue(data, for: characteristic, type: .withResponse)
+        // Use .withoutResponse (matching Android's WRITE_TYPE_NO_RESPONSE)
+        peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
     }
 
     /// Write without waiting for a BLE-level ACK (matches Android WRITE_TYPE_NO_RESPONSE).
@@ -128,7 +126,7 @@ class BikeManager: NSObject, ObservableObject {
         }
         logger.debug("TX (no-resp) \(data.count) bytes: \(data.hexString, privacy: .public)")
         debugLog.log("BLE", "TX (no-resp) \(data.count)B: \(data.hexString)")
-        peripheral.writeValue(data, for: characteristic, type: .withResponse)
+        peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
     }
 
     private func cleanup() {
