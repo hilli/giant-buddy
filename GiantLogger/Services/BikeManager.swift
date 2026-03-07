@@ -148,7 +148,7 @@ extension BikeManager: CBCentralManagerDelegate {
                let peripheral = peripherals.first {
                 connectedPeripheral = peripheral
                 peripheral.delegate = self
-                connectedPeripheralName = peripheral.name
+                connectedPeripheralName = peripheral.name?.trimmingCharacters(in: .whitespaces)
                 if peripheral.state == .connected {
                     connectionState = .discoveringServices
                     peripheral.discoverServices([serviceUUID])
@@ -189,9 +189,9 @@ extension BikeManager: CBCentralManagerDelegate {
             logger.info("Connected to peripheral \(peripheral.identifier.uuidString, privacy: .public)")
             debugLog.log("BLE", "Connected to \(peripheral.identifier.uuidString)")
             connectionState = .discoveringServices
-            connectedPeripheralName = peripheral.name
+            connectedPeripheralName = peripheral.name?.trimmingCharacters(in: .whitespaces)
             let discoveredName = discoveredDevices.first(where: { $0.peripheral.identifier == peripheral.identifier })?.name
-            let savedName = peripheral.name ?? discoveredName ?? "Unknown"
+            let savedName = (peripheral.name ?? discoveredName ?? "Unknown").trimmingCharacters(in: .whitespaces)
             UserDefaults.standard.set(savedName, forKey: "savedDeviceName")
             UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: "savedDeviceID")
             if autoConnectIdentifier != nil {

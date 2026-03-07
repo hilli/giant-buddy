@@ -58,6 +58,28 @@ struct DashboardView: View {
                     }
                     .padding()
                 }
+                .refreshable {
+                    if bikeService.isGevConnected {
+                        // Already connected — refresh telemetry
+                        bikeService.fetchAllBikeData()
+                        try? await Task.sleep(for: .seconds(7))
+                    } else if bikeManager.connectionState == .disconnected {
+                        // Not connected — scan and auto-connect
+                        bikeManager.startScan()
+                        // Wait up to 10s for a device to be discovered and connected
+                        for _ in 0..<100 {
+                            try? await Task.sleep(for: .milliseconds(100))
+                            if bikeManager.connectionState == .connected || bikeService.isGevConnected {
+                                break
+                            }
+                            // Auto-connect to the first discovered Giant bike
+                            if bikeManager.connectionState == .scanning,
+                               let first = bikeManager.discoveredDevices.first {
+                                bikeManager.connect(to: first.peripheral)
+                            }
+                        }
+                    }
+                }
                 .navigationTitle("Giant Logger")
                 .navigationBarTitleDisplayMode(.inline)
             }
