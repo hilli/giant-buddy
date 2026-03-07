@@ -55,11 +55,6 @@ struct DashboardView: View {
 
                         // Record button
                         recordButton
-
-                        // Bike controls
-                        if bikeService.isGevConnected {
-                            bikeControlsSection
-                        }
                     }
                     .padding()
                 }
@@ -108,9 +103,6 @@ struct DashboardView: View {
                     compactWeatherRow
                     if locationManager.currentLocation != nil {
                         compactMiniMap
-                    }
-                    if bikeService.isGevConnected {
-                        compactBikeControls
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -246,23 +238,6 @@ struct DashboardView: View {
         .frame(maxHeight: 80)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .allowsHitTesting(false)
-    }
-
-    private var compactBikeControls: some View {
-        HStack(spacing: 8) {
-            CompactControlButton(icon: "lightbulb.fill") {
-                bikeService.toggleLight()
-            }
-            CompactControlButton(icon: "minus.circle.fill") {
-                bikeService.assistDown()
-            }
-            CompactControlButton(icon: "plus.circle.fill") {
-                bikeService.assistUp()
-            }
-            CompactControlButton(icon: "power") {
-                bikeService.togglePower()
-            }
-        }
     }
 
     // MARK: - Components
@@ -427,28 +402,6 @@ struct DashboardView: View {
         }
     }
 
-    private var bikeControlsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Bike Controls")
-                .font(.headline)
-
-            HStack(spacing: 12) {
-                ControlButton(title: "Light", icon: "lightbulb.fill") {
-                    bikeService.toggleLight()
-                }
-                ControlButton(title: "Assist −", icon: "minus.circle.fill") {
-                    bikeService.assistDown()
-                }
-                ControlButton(title: "Assist +", icon: "plus.circle.fill") {
-                    bikeService.assistUp()
-                }
-                ControlButton(title: "Power", icon: "power") {
-                    bikeService.togglePower()
-                }
-            }
-        }
-    }
-
     // MARK: - Weather
 
     @ViewBuilder
@@ -605,30 +558,6 @@ struct MetricCard: View {
     }
 }
 
-struct ControlButton: View {
-    let title: String
-    let icon: String
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            action()
-        } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.title3)
-                Text(title)
-                    .font(.caption2)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 struct CompactMetricCard: View {
     let value: String
     let unit: String
@@ -652,24 +581,5 @@ struct CompactMetricCard: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 6)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-struct CompactControlButton: View {
-    let icon: String
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            action()
-        } label: {
-            Image(systemName: icon)
-                .font(.callout)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
     }
 }

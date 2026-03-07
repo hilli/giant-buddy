@@ -166,40 +166,6 @@ class GiantBikeService: ObservableObject {
         }
     }
 
-    func toggleLight() {
-        let data = GiantProtocol.triggerLightCommand()
-        debugLog.log("GEV", "TRIGGER light → \(data.count)B")
-        logTX(data)
-        sendTrigger(data)
-    }
-
-    func assistUp() {
-        let data = GiantProtocol.triggerAssistUpCommand()
-        debugLog.log("GEV", "TRIGGER assistUp → \(data.count)B")
-        logTX(data)
-        sendTrigger(data)
-    }
-
-    func assistDown() {
-        let data = GiantProtocol.triggerAssistDownCommand()
-        debugLog.log("GEV", "TRIGGER assistDown → \(data.count)B")
-        logTX(data)
-        sendTrigger(data)
-    }
-
-    func togglePower() {
-        let data = GiantProtocol.triggerPowerCommand()
-        debugLog.log("GEV", "TRIGGER power → \(data.count)B")
-        logTX(data)
-        sendTrigger(data)
-    }
-
-    /// Send a trigger command inline (matching Android's sendCommandWithoutResponse).
-    /// Android does NOT stop polling — triggers go through the shared write queue.
-    private func sendTrigger(_ data: Data) {
-        bikeManager?.write(data)
-    }
-
     // MARK: - Lifecycle
 
     private func onConnected() {
@@ -224,16 +190,7 @@ class GiantBikeService: ObservableObject {
             }
 
             isGevConnected = true
-            debugLog.log("GEV", "GEV session established — entering fitness mode")
-
-            // Enter fitness mode (required for trigger commands to work)
-            let modeData = GiantProtocol.intoFitnessMode()
-            debugLog.log("GEV", "Sending intoFitnessMode")
-            bikeManager?.write(modeData)
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled else { return }
-
-            debugLog.log("GEV", "Requesting static data")
+            debugLog.log("GEV", "GEV session established — requesting static data")
 
             // Request static info sequentially with delays
             requestFactoryData()
