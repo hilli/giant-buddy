@@ -120,7 +120,7 @@ struct ConnectionView: View {
             if !info.epVersion.isEmpty {
                 InfoRow(label: "Version", value: info.epVersion)
             }
-            if !info.epErrorCode.isEmpty && info.epErrorCode != "00000000000000000000000000000000" {
+            if !info.epErrorCode.isEmpty && !info.epErrorCode.allSatisfy({ $0 == "0" }) {
                 InfoRow(label: "Error Code", value: info.epErrorCode)
             }
         } header: {
@@ -132,8 +132,8 @@ struct ConnectionView: View {
 
     private func motorSection(_ info: BikeInfo) -> some View {
         Section {
-            if !info.motorType.isEmpty {
-                InfoRow(label: "Type", value: info.motorType)
+            if !info.motorModel.isEmpty {
+                InfoRow(label: "Model", value: info.motorModel)
             }
             if !info.motorFwVersion.isEmpty {
                 InfoRow(label: "Firmware", value: info.motorFwVersion)
@@ -141,13 +141,10 @@ struct ConnectionView: View {
             if !info.motorHwVersion.isEmpty {
                 InfoRow(label: "Hardware", value: info.motorHwVersion)
             }
-            if info.motorPSN > 0 {
-                InfoRow(label: "Serial Number", value: "\(info.motorPSN)")
-            }
-            if !info.motorErrorCode1.isEmpty && info.motorErrorCode1 != "00000000000000000000000000000000" {
+            if !info.motorErrorCode1.isEmpty && !info.motorErrorCode1.allSatisfy({ $0 == "0" }) {
                 InfoRow(label: "Error Code 1", value: info.motorErrorCode1)
             }
-            if !info.motorErrorCode2.isEmpty && info.motorErrorCode2 != "00000000000000000000000000000000" {
+            if !info.motorErrorCode2.isEmpty && !info.motorErrorCode2.allSatisfy({ $0 == "0" }) {
                 InfoRow(label: "Error Code 2", value: info.motorErrorCode2)
             }
         } header: {
@@ -165,10 +162,10 @@ struct ConnectionView: View {
             if !info.rcHwVersion.isEmpty {
                 InfoRow(label: "Hardware", value: info.rcHwVersion)
             }
-            if !info.rcErrorCode.isEmpty && info.rcErrorCode != "00000000000000000000000000000000" {
+            if !info.rcErrorCode.isEmpty && !info.rcErrorCode.allSatisfy({ $0 == "0" }) {
                 InfoRow(label: "Error Code", value: info.rcErrorCode)
             }
-            if !info.rcNode2ErrorCode.isEmpty && info.rcNode2ErrorCode != "00000000000000000000000000000000" {
+            if !info.rcNode2ErrorCode.isEmpty && !info.rcNode2ErrorCode.allSatisfy({ $0 == "0" }) {
                 InfoRow(label: "Node 2 Error", value: info.rcNode2ErrorCode)
             }
         } header: {

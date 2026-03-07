@@ -319,29 +319,16 @@ enum GiantProtocol {
         guard plain[0] == Command.passiveSD1.rawValue else { return }
         let b = Array(plain[2...])
         guard b.count >= 13 else { return }
-        // FW: 3 ASCII chars + 1 char + 3 hex bytes + 1 ASCII char
-        let fw1 = String(UnicodeScalar(b[0]))
-        let fw2 = String(UnicodeScalar(b[1]))
-        let fw3 = String(UnicodeScalar(b[2]))
-        let fw4 = String(UnicodeScalar(plain[5]))
-        let fwHex = b[4...6].map { String(format: "%02x", $0) }.joined()
-        let fw8 = String(UnicodeScalar(b[7]))
-        info.motorFwVersion = fw1 + fw2 + fw3 + fw4 + fwHex + fw8
-        // Determine motor type from FW version prefix
-        let prefix = String(info.motorFwVersion.prefix(3)).uppercased()
-        switch prefix {
-        case "S00", "S01": info.motorType = "SyncDrive Pro"
-        case "S10", "S11": info.motorType = "SyncDrive Sport"
-        case "S20", "S21": info.motorType = "SyncDrive Core"
-        case "S30", "S31": info.motorType = "SyncDrive Life"
-        default: info.motorType = "SyncDrive (\(prefix))"
-        }
+        // Model name: first 4 ASCII chars (e.g. "2YA0")
+        info.motorModel = (0...3).map { String(UnicodeScalar(b[$0])) }.joined()
+        // FW version: year(20XX)+month+day+revision  (b[4]=year-2000, b[5]=month, b[6]=day hex, b[7]=revision ASCII)
+        let year = 2000 + Int(b[4])
+        let month = Int(b[5])
+        let day = Int(b[6])
+        let rev = String(UnicodeScalar(b[7]))
+        info.motorFwVersion = String(format: "%04d%02d%02d%@", year, month, day, rev)
         // HW: 5 ASCII chars
         info.motorHwVersion = (8...12).map { String(UnicodeScalar(b[$0])) }.joined()
-        // PSN: only available if response has enough data (may need multi-packet)
-        if b.count > 17 {
-            info.motorPSN = Int(b[15]) | (Int(b[16]) << 8) | (Int(b[17]) << 16)
-        }
     }
 
     /// Parse service + avg amps (cmd 0x0A, PASSIVE_DATA_SYNC_DRIVE_2)
@@ -593,9 +580,9 @@ struct BikeInfo: Codable, Equatable {
     var rcNode2ErrorCode: String = ""
 
     // Motor / SyncDrive (0x09)
+    var motorModel: String = ""
     var motorFwVersion: String = ""
     var motorHwVersion: String = ""
-    var motorType: String = ""
     var motorPSN: Int = 0
 
     // Motor errors (0x0B, 0x0C)

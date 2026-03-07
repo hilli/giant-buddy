@@ -26,6 +26,8 @@ class GiantBikeService: ObservableObject {
     private var rangeTxCount = 0
     private var rangeRxCount = 0
     private var packetBuffer: [String] = []
+    /// Track which bike data commands have been processed (first-response wins)
+    private var processedBikeDataCmds = Set<UInt8>()
 
     init() {
         // Restore last known battery % so dashboard shows it when not connected
@@ -133,6 +135,7 @@ class GiantBikeService: ObservableObject {
     func fetchAllBikeData() {
         guard isGevConnected else { return }
         isFetchingBikeInfo = true
+        processedBikeDataCmds.removeAll()
         if bikeInfo == nil { bikeInfo = BikeInfo() }
 
         Task {
@@ -451,10 +454,17 @@ class GiantBikeService: ObservableObject {
     }
 
     private func handleBikeInfoResponse(_ plaintext: [UInt8], label: String) {
+        let cmdID = plaintext[0]
+
+        // First-response wins: skip if we've already processed this command
+        if processedBikeDataCmds.contains(cmdID) {
+            debugLog.log("GEV", "BikeInfo: \(label) duplicate response — skipping")
+            return
+        }
+        processedBikeDataCmds.insert(cmdID)
+
         if bikeInfo == nil { bikeInfo = BikeInfo() }
         guard var info = bikeInfo else { return }
-
-        let cmdID = plaintext[0]
         switch cmdID {
         case GiantProtocol.Command.passiveRC1.rawValue:
             GiantProtocol.parseRCVersion(plaintext, into: &info)
