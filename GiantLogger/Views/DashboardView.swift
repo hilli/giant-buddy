@@ -454,46 +454,41 @@ struct DashboardView: View {
     @ViewBuilder
     private var weatherSection: some View {
         if let current = weatherManager.currentWeather {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Weather")
-                    .font(.headline)
+            HStack(spacing: 16) {
+                // Current conditions
+                HStack(spacing: 8) {
+                    Image(systemName: current.symbolName)
+                        .font(.largeTitle)
+                        .symbolRenderingMode(.multicolor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(current.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
+                            .font(.title.bold())
+                        Text(current.condition.description)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
+                Spacer()
+
+                // Next 3 hours
                 HStack(spacing: 16) {
-                    // Current conditions
-                    HStack(spacing: 8) {
-                        Image(systemName: current.symbolName)
-                            .font(.title)
-                            .symbolRenderingMode(.multicolor)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(current.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
-                                .font(.title2.bold())
-                            Text(current.condition.description)
+                    ForEach(weatherManager.hourlyForecast, id: \.date) { hour in
+                        VStack(spacing: 4) {
+                            Text(hour.date.formatted(.dateTime.hour()))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
-
-                    // Next 3 hours
-                    HStack(spacing: 12) {
-                        ForEach(weatherManager.hourlyForecast, id: \.date) { hour in
-                            VStack(spacing: 4) {
-                                Text(hour.date.formatted(.dateTime.hour()))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Image(systemName: hour.symbolName)
-                                    .symbolRenderingMode(.multicolor)
-                                    .font(.callout)
-                                Text(hour.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
-                                    .font(.caption.bold())
-                            }
+                            Image(systemName: hour.symbolName)
+                                .symbolRenderingMode(.multicolor)
+                                .font(.title3)
+                            Text(hour.temperature.formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(0)))))
+                                .font(.callout.bold())
                         }
                     }
                 }
-                .padding()
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
+            .padding()
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
