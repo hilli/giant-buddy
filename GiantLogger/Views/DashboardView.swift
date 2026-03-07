@@ -347,7 +347,7 @@ struct DashboardView: View {
 
     private var batteryRangeRow: some View {
         HStack(spacing: 12) {
-            // Battery
+            // Battery + Range
             HStack {
                 batteryIcon
                 VStack(alignment: .leading) {
@@ -359,6 +359,14 @@ struct DashboardView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                VStack(alignment: .trailing) {
+                    Text("\(bikeService.rideData.range) km")
+                        .font(.title2.bold())
+                        .monospacedDigit()
+                    Text("Range")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding()
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -376,13 +384,6 @@ struct DashboardView: View {
                     Image(systemName: "timer")
                         .foregroundStyle(.cyan)
                     Text(formatDuration(rideRecorder.isRecording ? rideRecorder.elapsedSeconds : bikeService.rideData.rideTime))
-                        .font(.callout.bold())
-                        .monospacedDigit()
-                }
-                HStack {
-                    Image(systemName: "fuelpump.fill")
-                        .foregroundStyle(.mint)
-                    Text("\(bikeService.rideData.range) km range")
                         .font(.callout.bold())
                         .monospacedDigit()
                 }

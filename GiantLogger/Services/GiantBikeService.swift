@@ -29,6 +29,11 @@ class GiantBikeService: ObservableObject {
         // Restore last known battery % so dashboard shows it when not connected
         let saved = UserDefaults.standard.integer(forKey: "lastBatteryPercent")
         if saved > 0 { rideData.batteryPercent = saved }
+        // Restore last known range (eco)
+        let savedRange = UserDefaults.standard.integer(forKey: "lastRangeKm")
+        if savedRange > 0 {
+            rideData.rangeData = RemainingRangeData(eco: savedRange, normal: 0, power: 0, boost: 0, smart: 0)
+        }
     }
 
     func getAndClearPacketBuffer() -> String {
@@ -307,6 +312,7 @@ class GiantBikeService: ObservableObject {
             return
         }
         rideData.rangeData = rangeData
+        UserDefaults.standard.set(rangeData.eco, forKey: "lastRangeKm")
         let all = "eco=\(rangeData.eco) norm=\(rangeData.normal) pwr=\(rangeData.power) boost=\(rangeData.boost) smart=\(rangeData.smart)"
         logger.debug("Range: \(all, privacy: .public)")
         debugLog.log("GEV", "Range: \(all)")
