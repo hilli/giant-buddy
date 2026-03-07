@@ -194,23 +194,10 @@ class GiantBikeService: ObservableObject {
         sendTrigger(data)
     }
 
-    /// Send a trigger command: pause polling, wait for in-flight writes to clear,
-    /// write with BLE ACK (Android uses WRITE_TYPE_DEFAULT for all commands),
-    /// then resume polling after a delay.
+    /// Send a trigger command inline (matching Android's sendCommandWithoutResponse).
+    /// Android does NOT stop polling — triggers go through the shared write queue.
     private func sendTrigger(_ data: Data) {
-        // Pause polling so the trigger isn't queued behind a polling write
-        pollingTask?.cancel()
-        pollingTask = nil
-
-        Task {
-            // Wait for any in-flight polling writes to complete
-            try? await Task.sleep(for: .milliseconds(300))
-            // Write trigger with response (matching Android's WRITE_TYPE_DEFAULT)
-            bikeManager?.write(data)
-            // Wait for trigger write acknowledgment before resuming polling
-            try? await Task.sleep(for: .milliseconds(500))
-            startPolling()
-        }
+        bikeManager?.write(data)
     }
 
     // MARK: - Lifecycle
@@ -406,7 +393,7 @@ class GiantBikeService: ObservableObject {
         var factory = GiantProtocol.parseFactoryData(plaintext)
         // Frame number bytes are often zeros; use BLE device name instead (e.g., "GCHA12354")
         if let name = bikeManager?.connectedPeripheralName {
-            factory?.frameNumber = name
+            factory?.frameNumber = name.trimmingCharacters(in: .whitespaces)
         }
         factoryData = factory
         saveFactoryData()

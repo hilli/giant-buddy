@@ -611,7 +611,10 @@ struct ControlButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            action()
+        } label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.title3)
@@ -657,7 +660,10 @@ struct CompactControlButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            action()
+        } label: {
             Image(systemName: icon)
                 .font(.callout)
                 .frame(maxWidth: .infinity)
