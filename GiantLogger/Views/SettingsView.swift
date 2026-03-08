@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("logWorkouts") private var logWorkouts = false
     @AppStorage("savedDeviceName") private var savedDeviceName = ""
     @AppStorage("savedDeviceID") private var savedDeviceID = ""
+    @AppStorage("crashDetectionEnabled") private var crashDetectionEnabled = false
 
     @State private var showingShareSheet = false
     @State private var logSize = 0
@@ -85,6 +86,8 @@ struct SettingsView: View {
                 }
 
                 stravaSection
+
+                safetySection
 
                 debugLogSection
 
@@ -172,6 +175,39 @@ struct SettingsView: View {
                 Text("Connect your Strava account to upload rides.")
             }
         }
+    }
+
+    private var safetySection: some View {
+        Section {
+            NavigationLink {
+                EmergencyContactsView()
+            } label: {
+                HStack {
+                    Image(systemName: "shield.checkered")
+                        .foregroundStyle(.red)
+                    VStack(alignment: .leading) {
+                        Text("Emergency Contacts & Crash Detection")
+                        if crashDetectionEnabled {
+                            Text("Enabled • \(emergencyContactCount) contact(s)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Disabled")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Safety")
+        } footer: {
+            Text("Crash detection monitors for sudden impacts while riding and can alert your emergency contacts.")
+        }
+    }
+
+    private var emergencyContactCount: Int {
+        CrashDetector.loadEmergencyContacts().count
     }
 
     private var debugLogSection: some View {
