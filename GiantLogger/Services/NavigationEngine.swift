@@ -53,6 +53,9 @@ class NavigationEngine: ObservableObject {
     @Published var isRerouting = false
     @Published var hasArrived = false
     @Published var directionsAvailable = true
+    @Published var rerouteFailed = false
+    @Published var isOffRoute = false
+    @Published var offRouteDistance: Double = 0
 
     // MARK: - Settings
 
@@ -71,6 +74,7 @@ class NavigationEngine: ObservableObject {
     private var offRouteStartTime: Date?
     private var destinationCoordinate: CLLocationCoordinate2D?
     private var lastUpdateLocation: CLLocation?
+    private var routeCoordinates: [CLLocationCoordinate2D] = []
 
     private let arrivalThreshold: Double = 30 // meters
     private let offRouteThreshold: Double = 100 // meters
@@ -96,53 +100,71 @@ class NavigationEngine: ObservableObject {
     // MARK: - Directions Calculation
 
     /// Calculate MKDirections for the given route, extracting turn-by-turn steps.
+    /// Calculates leg-by-leg directions between consecutive waypoints to support intermediate waypoints.
     func calculateDirections(for route: Route) async {
         let waypoints = route.sortedWaypoints
-        guard waypoints.count >= 2 else {
-            directionsAvailable = false
-            return
-        }
+        guard waypoints.count >= 2 else { directionsAvailable = false; return }
+        destinationCoordinate = waypoints.last!.coordinate
 
-        let start = waypoints.first!
-        let end = waypoints.last!
-        destinationCoordinate = end.coordinate
+        var allSteps: [MKRoute.Step] = []
+        var allCoordinates: [CLLocationCoordinate2D] = []
 
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: start.coordinate))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: end.coordinate))
-        request.transportType = .cycling
+        for i in 0..<(waypoints.count - 1) {
+            let request = MKDirections.Request()
+            request.source = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i].coordinate))
+            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i+1].coordinate))
+            request.transportType = .cycling
 
-        let directions = MKDirections(request: request)
-
-        do {
-            let response = try await directions.calculate()
-            if let route = response.routes.first {
-                applyRoute(route)
-                return
+            let directions = MKDirections(request: request)
+            do {
+                let response = try await directions.calculate()
+                if let route = response.routes.first {
+                    allSteps.append(contentsOf: route.steps.filter { !$0.instructions.isEmpty })
+                    let coords = route.polyline.coordinates
+                    if !allCoordinates.isEmpty && !coords.isEmpty {
+                        allCoordinates.append(contentsOf: coords.dropFirst()) // avoid duplicate junction point
+                    } else {
+                        allCoordinates.append(contentsOf: coords)
+                    }
+                }
+            } catch {
+                // Try walking as fallback for this leg
+                let walkRequest = MKDirections.Request()
+                walkRequest.source = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i].coordinate))
+                walkRequest.destination = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i+1].coordinate))
+                walkRequest.transportType = .walking
+                let walkDirections = MKDirections(request: walkRequest)
+                if let response = try? await walkDirections.calculate(),
+                   let route = response.routes.first {
+                    allSteps.append(contentsOf: route.steps.filter { !$0.instructions.isEmpty })
+                    let coords = route.polyline.coordinates
+                    if !allCoordinates.isEmpty && !coords.isEmpty {
+                        allCoordinates.append(contentsOf: coords.dropFirst())
+                    } else {
+                        allCoordinates.append(contentsOf: coords)
+                    }
+                }
             }
-        } catch {
-            print("NavigationEngine: Cycling directions failed: \(error.localizedDescription)")
         }
 
-        // Fallback to walking directions
-        request.transportType = .walking
-        let fallback = MKDirections(request: request)
-        do {
-            let response = try await fallback.calculate()
-            if let route = response.routes.first {
-                applyRoute(route)
-                return
-            }
-        } catch {
-            print("NavigationEngine: Walking directions also failed: \(error.localizedDescription)")
-        }
+        routeSteps = allSteps
+        routeCoordinates = allCoordinates
+        directionsAvailable = !allSteps.isEmpty
+        currentStepIndex = 0
+        lastAnnouncedStepIndex = -1
+        lastAnnouncedDistance = .none
+        lastHapticStepIndex = -1
 
-        directionsAvailable = false
+        if directionsAvailable {
+            updateInstructions()
+            configureAudioSession()
+        }
     }
 
     private func applyRoute(_ route: MKRoute) {
         mkRoute = route
         routeSteps = route.steps.filter { !$0.instructions.isEmpty }
+        routeCoordinates = route.polyline.coordinates
         currentStepIndex = 0
         lastAnnouncedStepIndex = -1
         lastAnnouncedDistance = .none
@@ -337,7 +359,7 @@ class NavigationEngine: ObservableObject {
         var angle = toBearing - fromBearing
         // Normalize to -180...180
         while angle > 180 { angle -= 360 }
-        while angle < -180 { angle += 360 }
+        while angle <= -180 { angle += 360 }
 
         switch angle {
         case -180 ... -135: return .sharpLeft
@@ -470,13 +492,21 @@ class NavigationEngine: ObservableObject {
     // MARK: - Re-routing
 
     private func handleOffRouteDetection(location: CLLocation) {
-        guard let route = mkRoute else { return }
+        guard !routeCoordinates.isEmpty else { return }
 
-        // Check distance to route polyline
         let locationPoint = MKMapPoint(location.coordinate)
-        let distToRoute = distanceToPolyline(point: locationPoint, polyline: route.polyline)
+        var minDist = Double.greatestFiniteMagnitude
+        for i in 0..<(routeCoordinates.count - 1) {
+            let start = MKMapPoint(routeCoordinates[i])
+            let end = MKMapPoint(routeCoordinates[i + 1])
+            let dist = distanceFromPointToSegment(point: locationPoint, segStart: start, segEnd: end)
+            minDist = min(minDist, dist)
+        }
 
-        if distToRoute > offRouteThreshold {
+        offRouteDistance = minDist
+        isOffRoute = minDist > offRouteThreshold
+
+        if minDist > offRouteThreshold {
             if offRouteStartTime == nil {
                 offRouteStartTime = Date()
             } else if let start = offRouteStartTime,
@@ -531,6 +561,7 @@ class NavigationEngine: ObservableObject {
     /// Recalculate directions from current location to the destination.
     func reroute(from location: CLLocation, to destination: CLLocationCoordinate2D) async {
         isRerouting = true
+        rerouteFailed = false
 
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
@@ -550,18 +581,24 @@ class NavigationEngine: ObservableObject {
             print("NavigationEngine: Re-route cycling failed: \(error.localizedDescription)")
         }
 
-        // Fallback to walking
-        request.transportType = .walking
-        let fallback = MKDirections(request: request)
+        // Fallback to walking with fresh request
+        let walkingRequest = MKDirections.Request()
+        walkingRequest.source = request.source
+        walkingRequest.destination = request.destination
+        walkingRequest.transportType = .walking
+        let fallbackDirections = MKDirections(request: walkingRequest)
         do {
-            let response = try await fallback.calculate()
+            let response = try await fallbackDirections.calculate()
             if let route = response.routes.first {
                 applyRoute(route)
+                isRerouting = false
+                return
             }
         } catch {
             print("NavigationEngine: Re-route walking also failed: \(error.localizedDescription)")
         }
 
+        rerouteFailed = true
         isRerouting = false
     }
 
@@ -608,10 +645,30 @@ class NavigationEngine: ObservableObject {
 
     func stop() {
         stopVoice()
+        // Deactivate audio session
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("NavigationEngine: Audio session deactivation failed: \(error.localizedDescription)")
+        }
         routeSteps = []
+        routeCoordinates = []
         currentInstruction = nil
         nextInstruction = nil
         hasArrived = false
         isRerouting = false
+        rerouteFailed = false
+        isOffRoute = false
+        offRouteDistance = 0
+    }
+}
+
+// MARK: - MKPolyline Extension
+
+extension MKPolyline {
+    var coordinates: [CLLocationCoordinate2D] {
+        var coords = [CLLocationCoordinate2D](repeating: CLLocationCoordinate2D(), count: pointCount)
+        getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
+        return coords
     }
 }

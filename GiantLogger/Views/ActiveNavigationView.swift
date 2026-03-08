@@ -14,14 +14,9 @@ struct ActiveNavigationView: View {
     @State private var nearestIndex: Int = 0
     @State private var distanceRemaining: Double = 0  // km
     @State private var percentComplete: Double = 0
-    @State private var isOffRoute = false
-    @State private var offRouteDistance: Double = 0    // meters
-    @State private var offRouteTimer: Date?
     @State private var showArrival = false
     @State private var voiceEnabled = true
     @State private var hapticEnabled = true
-
-    private let offRouteThreshold: Double = 100 // meters
 
     private var sortedWaypoints: [RouteWaypoint] {
         route.sortedWaypoints
@@ -45,7 +40,7 @@ struct ActiveNavigationView: View {
                 if navigationEngine.isRerouting {
                     reroutingBanner
                 }
-                if isOffRoute {
+                if navigationEngine.isOffRoute {
                     offRouteBanner
                 }
                 statusBar
@@ -107,10 +102,12 @@ struct ActiveNavigationView: View {
     // MARK: - Navigation Banner
 
     private var navigationBanner: some View {
-        let instruction = navigationEngine.currentInstruction!
+        guard let instruction = navigationEngine.currentInstruction else {
+            return AnyView(EmptyView())
+        }
         let isUpcoming = navigationEngine.distanceToNextManeuver < 100
 
-        return HStack(spacing: 16) {
+        return AnyView(HStack(spacing: 16) {
             Image(systemName: instruction.maneuverType.sfSymbol)
                 .font(.system(size: 28, weight: .bold))
                 .frame(width: 44)
@@ -133,7 +130,7 @@ struct ActiveNavigationView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(isUpcoming ? Color.orange : Color.blue)
+        .background(isUpcoming ? Color.orange : Color.blue))
     }
 
     // MARK: - Fallback Notice
@@ -295,7 +292,7 @@ struct ActiveNavigationView: View {
     private var offRouteBanner: some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text("Off Route — \(Int(offRouteDistance))m away")
+            Text("Off Route — \(Int(navigationEngine.offRouteDistance))m away")
                 .font(.subheadline.bold())
         }
         .foregroundStyle(.white)
@@ -330,29 +327,6 @@ struct ActiveNavigationView: View {
         }
 
         nearestIndex = closestIdx
-
-        // Off-route detection using minimum distance to any segment
-        let segmentDist = minimumDistanceToRoute(from: userCL, coordinates: waypoints)
-        offRouteDistance = segmentDist
-        isOffRoute = segmentDist > offRouteThreshold
-
-        // Trigger re-routing via engine when off-route for >10s
-        if isOffRoute {
-            if offRouteTimer == nil {
-                offRouteTimer = Date()
-            } else if let timer = offRouteTimer,
-                      Date().timeIntervalSince(timer) > 10,
-                      let dest = allCoordinates.last,
-                      navigationEngine.directionsAvailable,
-                      !navigationEngine.isRerouting {
-                offRouteTimer = nil
-                Task {
-                    await navigationEngine.reroute(from: userCL, to: dest)
-                }
-            }
-        } else {
-            offRouteTimer = nil
-        }
 
         // Calculate remaining distance from nearest point to end
         var remaining: Double = 0
@@ -398,25 +372,16 @@ struct ActiveNavigationView: View {
 
     /// Distance from a point to a line segment defined by two CLLocations
     private func distanceFromPointToSegment(point: CLLocation, segStart: CLLocation, segEnd: CLLocation) -> Double {
-        let deltaX = segEnd.coordinate.longitude - segStart.coordinate.longitude
-        let deltaY = segEnd.coordinate.latitude - segStart.coordinate.latitude
-
-        if deltaX == 0 && deltaY == 0 {
-            return point.distance(from: segStart)
-        }
-
-        // Project point onto the segment using parametric form
-        let param = max(0, min(1,
-            ((point.coordinate.longitude - segStart.coordinate.longitude) * deltaX +
-             (point.coordinate.latitude - segStart.coordinate.latitude) * deltaY) /
-            (deltaX * deltaX + deltaY * deltaY)
-        ))
-
-        let projLat = segStart.coordinate.latitude + param * deltaY
-        let projLon = segStart.coordinate.longitude + param * deltaX
-        let projected = CLLocation(latitude: projLat, longitude: projLon)
-
-        return point.distance(from: projected)
+        let p = MKMapPoint(point.coordinate)
+        let a = MKMapPoint(segStart.coordinate)
+        let b = MKMapPoint(segEnd.coordinate)
+        let dx = b.x - a.x
+        let dy = b.y - a.y
+        let lengthSq = dx * dx + dy * dy
+        if lengthSq == 0 { return point.distance(from: segStart) }
+        let t = max(0, min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq))
+        let proj = MKMapPoint(x: a.x + t * dx, y: a.y + t * dy)
+        return p.distance(to: proj)
     }
 
     private var formattedRemaining: String {
