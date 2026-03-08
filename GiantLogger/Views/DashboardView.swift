@@ -13,6 +13,7 @@ struct DashboardView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var mapCameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var showSearch = false
 
     private var isLandscape: Bool {
         verticalSizeClass == .compact
@@ -83,7 +84,20 @@ struct DashboardView: View {
                 }
                 .navigationTitle("Giant Buddy")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { showSearch = true } label: {
+                            Image(systemName: "magnifyingglass")
+                        }
+                    }
+                }
             }
+        }
+        .sheet(isPresented: $showSearch) {
+            SearchView()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToRideTab)) { _ in
+            showSearch = false
         }
         .task(id: locationManager.currentLocation) {
             if let location = locationManager.currentLocation {

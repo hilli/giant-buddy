@@ -54,18 +54,6 @@ struct ContentView: View {
                     Label("Settings", systemImage: "gear")
                 }
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showSearch = true
-                } label: {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
-            }
-        }
-        .sheet(isPresented: $showSearch) {
-            SearchView()
-        }
         .fullScreenCover(isPresented: $crashDetector.isCrashDetected) {
             CrashAlertView(crashDetector: crashDetector, location: locationManager.currentLocation)
         }
