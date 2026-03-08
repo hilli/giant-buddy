@@ -39,16 +39,17 @@ class WatchSessionManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        guard WCSession.isSupported() else { return }
-        session = WCSession.default
-        session?.delegate = self
-        session?.activate()
-        requestHealthKitPermissions()
+        if WCSession.isSupported() {
+            session = WCSession.default
+            session?.delegate = self
+            session?.activate()
+        }
     }
 
     // MARK: - HealthKit Workout
 
     func startWorkout() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         let config = HKWorkoutConfiguration()
         config.activityType = .cycling
         config.locationType = .outdoor
@@ -82,6 +83,7 @@ class WatchSessionManager: NSObject, ObservableObject {
     }
 
     func requestHealthKitPermissions() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         let readTypes: Set<HKSampleType> = [
             HKQuantityType(.heartRate),
             HKQuantityType(.activeEnergyBurned)

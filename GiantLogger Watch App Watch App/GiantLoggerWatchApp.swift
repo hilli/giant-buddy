@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 @main
 struct GiantLoggerWatchApp: App {
@@ -8,6 +9,9 @@ struct GiantLoggerWatchApp: App {
         WindowGroup {
             DashboardView()
                 .environmentObject(sessionManager)
+                .onAppear {
+                    sessionManager.requestHealthKitPermissions()
+                }
         }
     }
 }
