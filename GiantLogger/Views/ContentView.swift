@@ -52,6 +52,7 @@ struct ContentView: View {
         .onAppear {
             if !hasConfigured {
                 bikeService.attach(to: bikeManager)
+                bikeService.modelContext = modelContext
                 rideRecorder.configure(
                     bikeService: bikeService,
                     locationManager: locationManager,

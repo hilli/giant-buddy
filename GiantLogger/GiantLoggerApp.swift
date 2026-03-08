@@ -12,7 +12,7 @@ struct GiantLoggerApp: App {
     @StateObject private var stravaService = StravaService.shared
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([Ride.self, RideSample.self, Route.self, RouteWaypoint.self])
+        let schema = Schema([Ride.self, RideSample.self, Route.self, RouteWaypoint.self, MaintenanceItem.self, BatterySnapshot.self, ErrorLogEntry.self])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,

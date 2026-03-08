@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import OSLog
+import SwiftData
 
 /// High-level interface to the Giant e-bike. Sends commands, parses responses,
 /// and publishes live telemetry data.
@@ -28,6 +29,9 @@ class GiantBikeService: ObservableObject {
     private var packetBuffer: [String] = []
     /// Track which bike data commands have been processed (first-response wins)
     private var processedBikeDataCmds = Set<UInt8>()
+
+    /// SwiftData context for inserting battery snapshots and error log entries
+    var modelContext: ModelContext?
 
     init() {
         // Restore last known battery % so dashboard shows it when not connected
@@ -161,6 +165,8 @@ class GiantBikeService: ObservableObject {
             }
             bikeInfo?.lastUpdated = Date()
             saveBikeInfo()
+            recordBatterySnapshotIfNeeded()
+            recordErrorCodesIfNeeded()
             isFetchingBikeInfo = false
             debugLog.log("GEV", "Bike data fetch complete")
         }
@@ -471,5 +477,51 @@ class GiantBikeService: ObservableObject {
 
     private func hexString(_ data: Data) -> String {
         data.map { String(format: "%02X", $0) }.joined()
+    }
+
+    // MARK: - Automatic Snapshots & Error Logging
+
+    private func recordBatterySnapshotIfNeeded() {
+        guard let ctx = modelContext, let info = bikeInfo else { return }
+        guard info.epLifePercent > 0 || info.epLastFullCapacityWh > 0 else { return }
+
+        let lastDate = UserDefaults.standard.object(forKey: "lastBatterySnapshotDate") as? Date
+        if let lastDate, Date.now.timeIntervalSince(lastDate) < 86400 { return }
+
+        let snapshot = BatterySnapshot(
+            capacityPercent: info.epCapacityPercent,
+            healthPercent: info.epLifePercent,
+            fullCapacityWh: info.epLastFullCapacityWh,
+            chargeCycles: info.epChargeCycles,
+            odometer: Double(info.odo)
+        )
+        ctx.insert(snapshot)
+        UserDefaults.standard.set(Date.now, forKey: "lastBatterySnapshotDate")
+        debugLog.log("GEV", "Battery snapshot recorded: health=\(info.epLifePercent)% cycles=\(info.epChargeCycles)")
+    }
+
+    private func recordErrorCodesIfNeeded() {
+        guard let ctx = modelContext, let info = bikeInfo else { return }
+        let odo = Double(info.odo)
+
+        func hasError(_ code: String) -> Bool {
+            !code.isEmpty && !code.allSatisfy({ $0 == "0" })
+        }
+
+        if hasError(info.motorErrorCode1) {
+            ctx.insert(ErrorLogEntry(source: "motor", errorCode: info.motorErrorCode1, odometer: odo))
+        }
+        if hasError(info.motorErrorCode2) {
+            ctx.insert(ErrorLogEntry(source: "motor", errorCode: info.motorErrorCode2, odometer: odo))
+        }
+        if hasError(info.rcErrorCode) {
+            ctx.insert(ErrorLogEntry(source: "rideControl", errorCode: info.rcErrorCode, odometer: odo))
+        }
+        if hasError(info.rcNode2ErrorCode) {
+            ctx.insert(ErrorLogEntry(source: "rideControl", errorCode: info.rcNode2ErrorCode, odometer: odo))
+        }
+        if hasError(info.epErrorCode) {
+            ctx.insert(ErrorLogEntry(source: "energyPak", errorCode: info.epErrorCode, odometer: odo))
+        }
     }
 }

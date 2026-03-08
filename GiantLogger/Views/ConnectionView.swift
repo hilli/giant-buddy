@@ -13,6 +13,10 @@ struct ConnectionView: View {
                 // Bike data (from cache or live)
                 if let info = bikeService.bikeInfo {
                     overviewSection(info)
+
+                    // Maintenance Tracker
+                    maintenanceSection
+
                     batterySection(info)
                     motorSection(info)
                     rideControlSection(info)
@@ -85,6 +89,26 @@ struct ConnectionView: View {
             }
         } header: {
             Text("Connection")
+        }
+    }
+
+    // MARK: - Maintenance
+
+    private var maintenanceSection: some View {
+        Section {
+            NavigationLink {
+                MaintenanceView()
+                    .environmentObject(bikeService)
+            } label: {
+                HStack {
+                    Image(systemName: "wrench.and.screwdriver")
+                        .foregroundStyle(.blue)
+                    Text("Maintenance Tracker")
+                    Spacer()
+                }
+            }
+        } header: {
+            Text("Maintenance")
         }
     }
 
