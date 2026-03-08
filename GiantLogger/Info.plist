@@ -5,24 +5,18 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleURLName</key>
+			<string>dk.hilli.GiantLogger</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>giantlogger</string>
 			</array>
-			<key>CFBundleURLName</key>
-			<string>dk.hilli.GiantLogger</string>
 		</dict>
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>strava</string>
 	</array>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Giant Logger reads your health data to display workout metrics during rides.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>Giant Logger saves your cycling workouts to Apple Health so they appear in Fitness.</string>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

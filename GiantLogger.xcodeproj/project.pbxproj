@@ -58,6 +58,14 @@
 			);
 			target = 2F1294D42F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-iosExtension */;
 		};
+		2F1296492F5D83D8009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				LastRideWidget.swift,
+				RideLiveActivity.swift,
+			);
+			target = TGT000000000000000000001 /* GiantLogger */;
+		};
 		EXC000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -68,7 +76,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F1294EF2F5D7B2A009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "dk.hilli.GiantLogger.widget-ios"; sourceTree = "<group>"; };
+		2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F1296492F5D83D8009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294EF2F5D7B2A009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "dk.hilli.GiantLogger.widget-ios"; sourceTree = "<group>"; };
 		SRC000000000000000000001 /* GiantLogger */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (EXC000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294F22F5D7BD0009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLogger; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -394,9 +402,12 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Giant Buddy needs access to your contacts to set up emergency contacts for crash detection.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides, even when the app is in the background.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Giant Buddy reads your health data to display workout metrics during rides.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy saves your cycling workouts to Apple Health so they appear in Fitness.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Buddy uses your location to record GPS tracks during rides, even when the app is in the background.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Giant Buddy uses your location to record GPS tracks during rides.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Giant Buddy uses motion data to detect potential crashes while riding and alert your emergency contacts.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -490,9 +501,12 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Giant Buddy needs access to your contacts to set up emergency contacts for crash detection.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides, even when the app is in the background.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Giant Buddy reads your health data to display workout metrics during rides.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy saves your cycling workouts to Apple Health so they appear in Fitness.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Buddy uses your location to record GPS tracks during rides, even when the app is in the background.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Giant Buddy uses your location to record GPS tracks during rides.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Giant Buddy uses motion data to detect potential crashes while riding and alert your emergency contacts.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
