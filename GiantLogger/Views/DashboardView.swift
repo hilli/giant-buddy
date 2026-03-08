@@ -14,6 +14,8 @@ struct DashboardView: View {
 
     @State private var mapCameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var showSearch = false
+    @State private var lastWeatherFetchLocation: CLLocation?
+    @State private var lastWeatherFetchTime: Date?
 
     private var isLandscape: Bool {
         verticalSizeClass == .compact
@@ -49,11 +51,11 @@ struct DashboardView: View {
                         // Battery & range row
                         batteryRangeRow
 
-                        // Weather
-                        weatherSection
-
                         // Mini map
                         miniMapSection
+
+                        // Weather
+                        weatherSection
 
                         // Record button
                         recordButton
@@ -102,11 +104,30 @@ struct DashboardView: View {
         .task(id: locationManager.currentLocation) {
             if let location = locationManager.currentLocation {
                 await weatherManager.fetchWeather(for: location)
+                if lastWeatherFetchLocation == nil {
+                    lastWeatherFetchLocation = location
+                    lastWeatherFetchTime = Date()
+                }
             }
         }
         .onChange(of: locationManager.currentLocation) { _, newLocation in
             if navigationEngine.activeRoute != nil, let loc = newLocation {
                 navigationEngine.updateLocation(loc)
+                // Refresh weather every 10km or 30min during navigation
+                let needsRefresh: Bool = {
+                    guard let lastLoc = lastWeatherFetchLocation,
+                          let lastTime = lastWeatherFetchTime else { return true }
+                    let distanceSince = loc.distance(from: lastLoc)
+                    let timeSince = Date().timeIntervalSince(lastTime)
+                    return distanceSince >= 10_000 || timeSince >= 1800
+                }()
+                if needsRefresh {
+                    lastWeatherFetchLocation = loc
+                    lastWeatherFetchTime = Date()
+                    Task {
+                        await weatherManager.refresh(for: loc)
+                    }
+                }
             }
         }
         .onAppear {
