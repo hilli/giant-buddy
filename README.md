@@ -1,4 +1,4 @@
-# Giant Logger iOS
+# Giant Buddy iOS
 
 iOS companion app for Giant e-bikes with RideControl+. Communicates with the bike over BLE using the Giant GEV protocol (AES-128-ECB encrypted), logs ride telemetry with GPS tracking, and exports rides as CSV/GPX.
 

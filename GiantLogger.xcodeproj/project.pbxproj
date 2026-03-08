@@ -207,7 +207,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GiantLogger/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Giant Logger";
+				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides, even when the app is in the background.";
@@ -301,7 +301,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GiantLogger/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Giant Logger";
+				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides, even when the app is in the background.";

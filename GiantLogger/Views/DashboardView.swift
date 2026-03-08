@@ -30,7 +30,7 @@ struct DashboardView: View {
         NavigationStack {
             if isLandscape {
                 landscapeDashboard
-                    .navigationTitle("Giant Logger")
+                    .navigationTitle("Giant Buddy")
                     .navigationBarTitleDisplayMode(.inline)
             } else {
                 ScrollView {
@@ -80,7 +80,7 @@ struct DashboardView: View {
                         }
                     }
                 }
-                .navigationTitle("Giant Logger")
+                .navigationTitle("Giant Buddy")
                 .navigationBarTitleDisplayMode(.inline)
             }
         }
