@@ -8,12 +8,18 @@ struct ActiveNavigationView: View {
     @EnvironmentObject private var locationManager: LocationManager
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var navigationEngine = NavigationEngine()
+
     @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var nearestIndex: Int = 0
     @State private var distanceRemaining: Double = 0  // km
     @State private var percentComplete: Double = 0
     @State private var isOffRoute = false
     @State private var offRouteDistance: Double = 0    // meters
+    @State private var offRouteTimer: Date?
+    @State private var showArrival = false
+    @State private var voiceEnabled = true
+    @State private var hapticEnabled = true
 
     private let offRouteThreshold: Double = 100 // meters
 
@@ -30,10 +36,23 @@ struct ActiveNavigationView: View {
             mapView
 
             VStack(spacing: 0) {
+                if navigationEngine.directionsAvailable, navigationEngine.currentInstruction != nil {
+                    navigationBanner
+                }
+                if !navigationEngine.directionsAvailable {
+                    fallbackNoticeBanner
+                }
+                if navigationEngine.isRerouting {
+                    reroutingBanner
+                }
                 if isOffRoute {
                     offRouteBanner
                 }
                 statusBar
+            }
+
+            if showArrival {
+                arrivalOverlay
             }
         }
         .navigationTitle("Navigation")
@@ -41,20 +60,151 @@ struct ActiveNavigationView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("End") {
+                    navigationEngine.stop()
                     dismiss()
                 }
                 .foregroundStyle(.red)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: 12) {
+                    Button {
+                        voiceEnabled.toggle()
+                        navigationEngine.voiceGuidanceEnabled = voiceEnabled
+                        if !voiceEnabled { navigationEngine.stopVoice() }
+                    } label: {
+                        Image(systemName: voiceEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    }
+                    Button {
+                        hapticEnabled.toggle()
+                        navigationEngine.hapticFeedbackEnabled = hapticEnabled
+                    } label: {
+                        Image(systemName: hapticEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
+                    }
+                }
             }
         }
         .onAppear {
             locationManager.startTracking()
             updateNavigation()
+            Task {
+                await navigationEngine.calculateDirections(for: route)
+            }
         }
         .onDisappear {
+            navigationEngine.stop()
             locationManager.stopTracking()
         }
         .onChange(of: locationManager.currentLocation) {
             updateNavigation()
+        }
+        .onChange(of: navigationEngine.hasArrived) {
+            if navigationEngine.hasArrived {
+                withAnimation(.spring()) { showArrival = true }
+            }
+        }
+    }
+
+    // MARK: - Navigation Banner
+
+    private var navigationBanner: some View {
+        let instruction = navigationEngine.currentInstruction!
+        let isUpcoming = navigationEngine.distanceToNextManeuver < 100
+
+        return HStack(spacing: 16) {
+            Image(systemName: instruction.maneuverType.sfSymbol)
+                .font(.system(size: 28, weight: .bold))
+                .frame(width: 44)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(instruction.maneuverType.rawValue)
+                    .font(.headline)
+                if let street = instruction.streetName {
+                    Text("onto \(street)")
+                        .font(.subheadline)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Text(formattedManeuverDistance(navigationEngine.distanceToNextManeuver))
+                .font(.title2.bold().monospacedDigit())
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(isUpcoming ? Color.orange : Color.blue)
+    }
+
+    // MARK: - Fallback Notice
+
+    private var fallbackNoticeBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "info.circle.fill")
+            Text("Turn-by-turn unavailable — using breadcrumb navigation")
+                .font(.caption)
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+    }
+
+    // MARK: - Rerouting Banner
+
+    private var reroutingBanner: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .tint(.white)
+            Text("Rerouting…")
+                .font(.subheadline.bold())
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(.orange)
+    }
+
+    // MARK: - Arrival Overlay
+
+    private var arrivalOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                Image(systemName: "flag.checkered")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.green)
+
+                Text("You've Arrived!")
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(.white)
+
+                VStack(spacing: 8) {
+                    Text(route.name)
+                        .font(.title3)
+                        .foregroundStyle(.white.opacity(0.9))
+                    Text(route.formattedDistance)
+                        .font(.headline)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+
+                Button {
+                    navigationEngine.stop()
+                    dismiss()
+                } label: {
+                    Text("Done")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.green, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal, 40)
+                .padding(.top, 10)
+            }
+            .padding(30)
         }
     }
 
@@ -186,6 +336,24 @@ struct ActiveNavigationView: View {
         offRouteDistance = segmentDist
         isOffRoute = segmentDist > offRouteThreshold
 
+        // Trigger re-routing via engine when off-route for >10s
+        if isOffRoute {
+            if offRouteTimer == nil {
+                offRouteTimer = Date()
+            } else if let timer = offRouteTimer,
+                      Date().timeIntervalSince(timer) > 10,
+                      let dest = allCoordinates.last,
+                      navigationEngine.directionsAvailable,
+                      !navigationEngine.isRerouting {
+                offRouteTimer = nil
+                Task {
+                    await navigationEngine.reroute(from: userCL, to: dest)
+                }
+            }
+        } else {
+            offRouteTimer = nil
+        }
+
         // Calculate remaining distance from nearest point to end
         var remaining: Double = 0
         for idx in closestIdx..<(waypoints.count - 1) {
@@ -202,6 +370,9 @@ struct ActiveNavigationView: View {
         } else {
             percentComplete = 0
         }
+
+        // Feed location to navigation engine for turn-by-turn
+        navigationEngine.updateLocation(userCL)
     }
 
     /// Minimum perpendicular distance from a point to the nearest route segment
@@ -253,6 +424,13 @@ struct ActiveNavigationView: View {
             return String(format: "%.0f m", distanceRemaining * 1000)
         }
         return String(format: "%.1f km", distanceRemaining)
+    }
+
+    private func formattedManeuverDistance(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.1f km", meters / 1000)
+        }
+        return String(format: "%.0f m", meters)
     }
 }
 
