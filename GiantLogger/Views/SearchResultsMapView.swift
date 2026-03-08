@@ -8,6 +8,8 @@ struct SearchResultsMapView: View {
     let searchTitle: String
 
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var navigationEngine: NavigationEngine
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var searchService = POISearchService()
 
     @State private var mapCameraPosition: MapCameraPosition = .automatic
@@ -133,6 +135,18 @@ struct SearchResultsMapView: View {
                 }
                 .buttonStyle(.bordered)
             }
+
+            Button {
+                startNavigation(to: result)
+            } label: {
+                Label("Start Navigation", systemImage: "location.north.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .disabled(locationManager.currentLocation == nil)
         }
         .padding()
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -178,6 +192,34 @@ struct SearchResultsMapView: View {
             route = await searchService.getDirections(to: result, from: location)
             isLoadingRoute = false
         }
+    }
+
+    private func startNavigation(to result: POISearchService.POIResult) {
+        guard let userLocation = locationManager.currentLocation else { return }
+
+        let navRoute = Route(name: result.name, source: "search_navigation")
+
+        let startWP = RouteWaypoint(
+            index: 0,
+            latitude: userLocation.coordinate.latitude,
+            longitude: userLocation.coordinate.longitude,
+            altitude: userLocation.altitude
+        )
+        let endWP = RouteWaypoint(
+            index: 1,
+            latitude: result.coordinate.latitude,
+            longitude: result.coordinate.longitude
+        )
+
+        navRoute.waypoints = [startWP, endWP]
+        navRoute.recalculateStats()
+
+        Task {
+            await navigationEngine.calculateDirections(for: navRoute)
+        }
+
+        NotificationCenter.default.post(name: .switchToRideTab, object: nil)
+        dismiss()
     }
 
     private func formattedDistance(_ meters: Double) -> String {

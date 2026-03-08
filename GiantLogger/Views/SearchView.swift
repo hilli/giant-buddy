@@ -4,6 +4,7 @@ import MapKit
 /// POI and address search view, intended to be presented as a sheet.
 struct SearchView: View {
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var navigationEngine: NavigationEngine
     @StateObject private var searchService = POISearchService()
 
     @State private var searchText = ""
@@ -36,6 +37,7 @@ struct SearchView: View {
                     searchTitle: activeCategory?.rawValue ?? searchText
                 )
                 .environmentObject(locationManager)
+                .environmentObject(navigationEngine)
             }
         }
     }

@@ -72,6 +72,7 @@ struct ContentView: View {
         .tint(.accentColor)
         .onReceive(NotificationCenter.default.publisher(for: .switchToRideTab)) { _ in
             selectedTab = 0
+            showSearch = false
         }
         .onChange(of: rideRecorder.isRecording) { _, isRecording in
             let enabled = UserDefaults.standard.bool(forKey: "crashDetectionEnabled")
