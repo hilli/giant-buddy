@@ -119,38 +119,7 @@ struct RouteMapView: View {
     // MARK: - Elevation Profile
 
     private var elevationProfileSection: some View {
-        VStack(alignment: .leading) {
-            Text("Elevation Profile")
-                .font(.headline)
-                .padding(.horizontal)
-
-            Chart(elevationData, id: \.distance) { point in
-                AreaMark(
-                    x: .value("Distance (km)", point.distance),
-                    y: .value("Altitude (m)", point.altitude)
-                )
-                .foregroundStyle(
-                    .linearGradient(
-                        colors: [.brown.opacity(0.6), .brown.opacity(0.1)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .interpolationMethod(.catmullRom)
-
-                LineMark(
-                    x: .value("Distance (km)", point.distance),
-                    y: .value("Altitude (m)", point.altitude)
-                )
-                .foregroundStyle(.brown)
-                .interpolationMethod(.catmullRom)
-            }
-            .chartYAxisLabel("m")
-            .chartXAxisLabel("km")
-            .frame(height: 150)
-            .padding(.horizontal)
-        }
-        .padding(.vertical)
+        ElevationProfileView(elevationData: ElevationProfileView.elevationData(from: sortedWaypoints))
     }
 
     // MARK: - Range Prediction
@@ -235,32 +204,6 @@ struct RouteMapView: View {
         case .critical: return .red
         case .depleted: return .red.opacity(0.5)
         }
-    }
-
-    private struct ElevationPoint {
-        let distance: Double // km
-        let altitude: Double // m
-    }
-
-    private var elevationData: [ElevationPoint] {
-        let sorted = sortedWaypoints
-        guard sorted.count >= 2 else {
-            return sorted.map { ElevationPoint(distance: 0, altitude: $0.altitude) }
-        }
-
-        var result: [ElevationPoint] = []
-        var cumDist: Double = 0
-
-        result.append(ElevationPoint(distance: 0, altitude: sorted[0].altitude))
-
-        for idx in 1..<sorted.count {
-            let prev = CLLocation(latitude: sorted[idx - 1].latitude, longitude: sorted[idx - 1].longitude)
-            let curr = CLLocation(latitude: sorted[idx].latitude, longitude: sorted[idx].longitude)
-            cumDist += curr.distance(from: prev) / 1000.0
-            result.append(ElevationPoint(distance: cumDist, altitude: sorted[idx].altitude))
-        }
-
-        return result
     }
 
     private func exportRouteAsGPX() {

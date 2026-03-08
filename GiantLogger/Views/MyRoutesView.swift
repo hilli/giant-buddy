@@ -7,6 +7,7 @@ struct MyRoutesView: View {
     @Query(sort: \Route.createdDate, order: .reverse) private var routes: [Route]
 
     @State private var showFileImporter = false
+    @State private var showRouteEditor = false
     @State private var importError: String?
     @State private var showImportError = false
 
@@ -33,11 +34,25 @@ struct MyRoutesView: View {
             .navigationTitle("My Routes")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showFileImporter = true
+                    Menu {
+                        Button {
+                            showFileImporter = true
+                        } label: {
+                            Label("Import GPX", systemImage: "square.and.arrow.down")
+                        }
+                        Button {
+                            showRouteEditor = true
+                        } label: {
+                            Label("Create Route", systemImage: "pencil.and.outline")
+                        }
                     } label: {
-                        Label("Import GPX", systemImage: "square.and.arrow.down")
+                        Image(systemName: "plus")
                     }
+                }
+            }
+            .sheet(isPresented: $showRouteEditor) {
+                NavigationStack {
+                    RouteEditorView()
                 }
             }
             .fileImporter(
