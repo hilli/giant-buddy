@@ -93,6 +93,7 @@ final class RideSample {
     var latitude: Double = 0
     var longitude: Double = 0
     var altitude: Double = 0         // meters
+    var heartRate: Double = 0        // BPM from Apple Watch
     var gpsSpeed: Double = 0         // m/s
     var course: Double = 0           // degrees
 

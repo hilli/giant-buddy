@@ -9,6 +9,10 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     private var session: WCSession?
 
+    // Heart rate from Watch
+    @Published var heartRate: Double = 0
+    @Published var activeCalories: Double = 0
+
     // Callbacks for Watch commands
     var onStartRecording: (() -> Void)?
     var onStopRecording: (() -> Void)?
@@ -90,6 +94,9 @@ extension WatchConnectivityManager: WCSessionDelegate {
                 case "stopRecording": onStopRecording?()
                 default: break
                 }
+            } else if let type = message["type"] as? String, type == "heartRate" {
+                if let hr = message["heartRate"] as? Double { self.heartRate = hr }
+                if let cal = message["activeCalories"] as? Double { self.activeCalories = cal }
             }
         }
     }

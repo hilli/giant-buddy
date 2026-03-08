@@ -13,6 +13,7 @@ class RideRecorder: ObservableObject {
     @Published var currentRide: Ride?
     @Published var sampleCount = 0
     @Published var elapsedSeconds: Int = 0
+    @Published var heartRate: Double = 0
 
     var recordingInterval: TimeInterval = 2.0
     private let liveActivityManager = LiveActivityManager()
@@ -117,6 +118,7 @@ class RideRecorder: ObservableObject {
         durationTask?.cancel()
         durationTask = nil
         isRecording = false
+        heartRate = 0
         liveActivityManager.endActivity()
 
         // Notify Watch that recording stopped
@@ -211,11 +213,15 @@ class RideRecorder: ObservableObject {
             course: max(0, location?.course ?? 0)
         )
         sample.ride = currentRide
+        sample.heartRate = watchConnectivity.heartRate
         sample.packetLog = bikeService.getAndClearPacketBuffer()
         if currentRide.samples == nil { currentRide.samples = [] }
         currentRide.samples?.append(sample)
         modelContext.insert(sample)
         sampleCount += 1
+
+        // Update heart rate from Watch
+        heartRate = watchConnectivity.heartRate
 
         // Periodic save
         if sampleCount % 10 == 0 {

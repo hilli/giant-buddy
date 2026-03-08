@@ -49,6 +49,9 @@ struct DashboardView: View {
                         // Primary metrics grid
                         primaryMetricsGrid
 
+                        // Heart rate from Apple Watch
+                        heartRateSection
+
                         // Battery & range row
                         batteryRangeRow
 
@@ -170,6 +173,7 @@ struct DashboardView: View {
                 // Right side: Metrics, Map, Controls
                 VStack(spacing: 8) {
                     compactMetricsRow
+                    compactHeartRateRow
                     compactBatteryInfo
                     compactWeatherRow
                     if locationManager.currentLocation != nil {
@@ -243,6 +247,21 @@ struct DashboardView: View {
                 icon: "bolt.car.fill",
                 color: .cyan
             )
+        }
+    }
+
+    private var compactHeartRateRow: some View {
+        Group {
+            if rideRecorder.heartRate > 0 {
+                HStack(spacing: 8) {
+                    CompactMetricCard(
+                        value: String(format: "%.0f", rideRecorder.heartRate),
+                        unit: "bpm",
+                        icon: "heart.fill",
+                        color: .red
+                    )
+                }
+            }
         }
     }
 
@@ -395,6 +414,23 @@ struct DashboardView: View {
                 icon: "bolt.car.fill",
                 color: .cyan
             )
+        }
+    }
+
+    // Heart rate from Apple Watch
+    private var heartRateSection: some View {
+        Group {
+            if rideRecorder.heartRate > 0 {
+                LazyVGrid(columns: [GridItem(.flexible())], spacing: 12) {
+                    MetricCard(
+                        title: "Heart Rate",
+                        value: String(format: "%.0f", rideRecorder.heartRate),
+                        unit: "bpm",
+                        icon: "heart.fill",
+                        color: .red
+                    )
+                }
+            }
         }
     }
 

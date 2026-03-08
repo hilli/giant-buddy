@@ -63,6 +63,23 @@ struct DashboardView: View {
                     Spacer()
                 }
             }
+
+            if session.heartRate > 0 {
+                HStack(spacing: 16) {
+                    metricItem(
+                        icon: "heart.fill",
+                        value: String(format: "%.0f bpm", session.heartRate),
+                        color: .red
+                    )
+                    if session.activeCalories > 0 {
+                        metricItem(
+                            icon: "flame.fill",
+                            value: String(format: "%.0f kcal", session.activeCalories),
+                            color: .orange
+                        )
+                    }
+                }
+            }
         }
         .padding(.top, 4)
     }
