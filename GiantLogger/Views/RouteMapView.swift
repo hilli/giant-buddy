@@ -1,10 +1,16 @@
 import SwiftUI
+import SwiftData
 import MapKit
 import Charts
 
 struct RouteMapView: View {
     let route: Route
 
+    @EnvironmentObject var bikeService: GiantBikeService
+    @Query(sort: \Ride.startDate) private var rides: [Ride]
+    @StateObject private var rangePredictor = RangePredictor()
+
+    @State private var prediction: RangePredictor.RoutePrediction?
     @State private var isNavigating = false
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var exportURL: RouteExportURL?
@@ -23,11 +29,18 @@ struct RouteMapView: View {
                 mapSection
                 statsSection
                 elevationProfileSection
+                rangePredictionSection
                 startButton
             }
         }
         .navigationTitle(route.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            rangePredictor.learnFromRides(rides)
+            let battery = bikeService.rideData.batteryPercent
+            let currentBattery = battery > 0 ? battery : 100
+            prediction = rangePredictor.predict(route: route, currentBattery: currentBattery)
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -51,8 +64,15 @@ struct RouteMapView: View {
 
     private var mapSection: some View {
         Map(position: $cameraPosition) {
-            MapPolyline(coordinates: coordinates)
-                .stroke(.blue, lineWidth: 3)
+            if let prediction, prediction.segments.count >= 2 {
+                ForEach(coloredRouteSegments(prediction: prediction)) { segment in
+                    MapPolyline(coordinates: segment.coordinates)
+                        .stroke(segment.color, lineWidth: 3)
+                }
+            } else {
+                MapPolyline(coordinates: coordinates)
+                    .stroke(.blue, lineWidth: 3)
+            }
 
             if let start = coordinates.first {
                 Annotation("Start", coordinate: start) {
@@ -85,6 +105,13 @@ struct RouteMapView: View {
             StatTile(icon: "arrow.up", title: "Max Altitude", value: String(format: "%.0f m", route.maxAltitude))
             StatTile(icon: "arrow.down", title: "Min Altitude", value: String(format: "%.0f m", route.minAltitude))
             StatTile(icon: "point.topleft.down.to.point.bottomright.curvepath", title: "Source", value: sourceLabel)
+            if let prediction {
+                StatTile(
+                    icon: prediction.canComplete ? "battery.100.bolt" : "battery.0",
+                    title: "Est. End Battery",
+                    value: "\(Int(prediction.estimatedEndBattery))%"
+                )
+            }
         }
         .padding(.horizontal)
     }
@@ -126,6 +153,16 @@ struct RouteMapView: View {
         .padding(.vertical)
     }
 
+    // MARK: - Range Prediction
+
+    private var rangePredictionSection: some View {
+        Group {
+            if let prediction {
+                RangePredictionView(prediction: prediction, routeDistance: route.totalDistance)
+            }
+        }
+    }
+
     // MARK: - Start Button
 
     private var startButton: some View {
@@ -150,6 +187,53 @@ struct RouteMapView: View {
         case "ride_conversion": return "Ride"
         case "manual": return "Manual"
         default: return route.source
+        }
+    }
+
+    // MARK: - Colored Route Segments
+
+    private struct ColoredSegment: Identifiable {
+        let id = UUID()
+        let coordinates: [CLLocationCoordinate2D]
+        let color: Color
+    }
+
+    private func coloredRouteSegments(prediction: RangePredictor.RoutePrediction) -> [ColoredSegment] {
+        let waypoints = sortedWaypoints
+        guard waypoints.count >= 2, prediction.segments.count == waypoints.count else {
+            return [ColoredSegment(coordinates: coordinates, color: .blue)]
+        }
+
+        var segments: [ColoredSegment] = []
+        var currentCoords: [CLLocationCoordinate2D] = [waypoints[0].coordinate]
+        var currentColor = colorForStatus(prediction.segments[0].status)
+
+        for i in 1..<waypoints.count {
+            let segColor = colorForStatus(prediction.segments[i].status)
+            if segColor == currentColor {
+                currentCoords.append(waypoints[i].coordinate)
+            } else {
+                // Bridge: include this point in both to avoid gaps
+                currentCoords.append(waypoints[i].coordinate)
+                segments.append(ColoredSegment(coordinates: currentCoords, color: currentColor))
+                currentCoords = [waypoints[i].coordinate]
+                currentColor = segColor
+            }
+        }
+
+        if currentCoords.count >= 2 {
+            segments.append(ColoredSegment(coordinates: currentCoords, color: currentColor))
+        }
+
+        return segments
+    }
+
+    private func colorForStatus(_ status: RangePredictor.SegmentStatus) -> Color {
+        switch status {
+        case .safe:     return .green
+        case .warning:  return .yellow
+        case .critical: return .red
+        case .depleted: return .red.opacity(0.5)
         }
     }
 
@@ -265,5 +349,6 @@ private struct RouteShareSheet: UIViewControllerRepresentable {
     NavigationStack {
         RouteMapView(route: route)
     }
-    .modelContainer(for: [Route.self, RouteWaypoint.self], inMemory: true)
+    .environmentObject(GiantBikeService())
+    .modelContainer(for: [Route.self, RouteWaypoint.self, Ride.self, RideSample.self], inMemory: true)
 }
