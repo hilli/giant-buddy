@@ -23,35 +23,35 @@ class POISearchService: ObservableObject {
     enum POICategory: String, CaseIterable, Identifiable {
         case toilet = "Public Toilet"
         case bikeShop = "Bicycle Repair"
-        case charging = "Charging Station"
         case cafe = "Café"
+        case drinkingWater = "Drinking Water"
 
         var id: String { rawValue }
 
         var icon: String {
             switch self {
-            case .toilet:   return "toilet"
-            case .bikeShop: return "wrench.and.screwdriver"
-            case .charging: return "ev.plug.dc.ccs2"
-            case .cafe:     return "cup.and.saucer"
+            case .toilet:       return "toilet"
+            case .bikeShop:     return "wrench.and.screwdriver"
+            case .cafe:         return "cup.and.saucer"
+            case .drinkingWater: return "drop.fill"
             }
         }
 
         var searchQuery: String {
             switch self {
-            case .toilet:   return "public toilet restroom"
-            case .bikeShop: return "bicycle repair bike shop"
-            case .charging: return "EV charging station"
-            case .cafe:     return "café coffee shop"
+            case .toilet:       return "public toilet restroom"
+            case .bikeShop:     return "bicycle repair"
+            case .cafe:         return "café coffee shop"
+            case .drinkingWater: return "drinking water fountain"
             }
         }
 
         var color: Color {
             switch self {
-            case .toilet:   return .blue
-            case .bikeShop: return .orange
-            case .charging: return .green
-            case .cafe:     return .brown
+            case .toilet:       return .blue
+            case .bikeShop:     return .orange
+            case .cafe:         return .brown
+            case .drinkingWater: return .cyan
             }
         }
     }
