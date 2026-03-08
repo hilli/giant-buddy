@@ -24,28 +24,26 @@ struct MaintenanceView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                componentsSection
-                batterySection
-                errorSection
-            }
-            .navigationTitle("Maintenance")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showAddSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
+        List {
+            componentsSection
+            batterySection
+            errorSection
+        }
+        .navigationTitle("Maintenance")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
                 }
             }
-            .sheet(isPresented: $showAddSheet) {
-                AddComponentSheet(currentOdo: currentOdo)
-            }
-            .sheet(item: $editingItem) { item in
-                EditComponentSheet(item: item, currentOdo: currentOdo)
-            }
+        }
+        .sheet(isPresented: $showAddSheet) {
+            AddComponentSheet(currentOdo: currentOdo)
+        }
+        .sheet(item: $editingItem) { item in
+            EditComponentSheet(item: item, currentOdo: currentOdo)
         }
     }
 
