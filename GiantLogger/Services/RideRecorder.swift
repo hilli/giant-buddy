@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import Combine
 import CoreLocation
+import ActivityKit
 
 /// Records ride telemetry + GPS samples and manages ride lifecycle.
 @MainActor
@@ -13,6 +14,7 @@ class RideRecorder: ObservableObject {
     @Published var elapsedSeconds: Int = 0
 
     var recordingInterval: TimeInterval = 2.0
+    private let liveActivityManager = LiveActivityManager()
     var autoRecord: Bool {
         get { UserDefaults.standard.bool(forKey: "autoRecord") }
         set { UserDefaults.standard.set(newValue, forKey: "autoRecord") }
@@ -76,6 +78,7 @@ class RideRecorder: ObservableObject {
 
         locationManager?.startTracking()
         if logWorkouts { workoutManager?.startWorkout() }
+        liveActivityManager.startActivity()
 
         // Tick elapsed time every second
         durationTask = Task {
@@ -101,6 +104,7 @@ class RideRecorder: ObservableObject {
         durationTask?.cancel()
         durationTask = nil
         isRecording = false
+        liveActivityManager.endActivity()
 
         // Discard rides where user hasn't moved (< 10m) or has no samples
         if let ride = currentRide {
@@ -194,6 +198,18 @@ class RideRecorder: ObservableObject {
         if logWorkouts, let location {
             workoutManager?.addRouteLocation(location)
         }
+
+        // Update Live Activity with current telemetry
+        let movingSamples = (currentRide.samples ?? []).filter { $0.speed > 0.5 }
+        let avg = movingSamples.isEmpty ? 0.0 : movingSamples.map(\.speed).reduce(0, +) / Double(movingSamples.count)
+        liveActivityManager.updateActivity(
+            speed: bikeService.rideData.speed,
+            distance: accumulatedDistance,
+            elapsed: elapsedSeconds,
+            battery: bikeService.rideData.batteryPercent,
+            avgSpeed: avg,
+            power: bikeService.rideData.watts
+        )
     }
 
     /// Haversine distance in kilometers between two GPS coordinates.

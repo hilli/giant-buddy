@@ -21,6 +21,8 @@
 	<string>Giant Logger reads your health data to display workout metrics during rides.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Giant Logger saves your cycling workouts to Apple Health so they appear in Fitness.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
