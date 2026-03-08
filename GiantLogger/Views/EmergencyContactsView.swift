@@ -1,3 +1,4 @@
+import ContactsUI
 import SwiftUI
 
 /// Settings view for managing emergency contacts and crash detection preferences.
@@ -96,9 +97,11 @@ struct EmergencyContactsView: View {
             }
         }
         .sheet(isPresented: $isAddingNew) {
-            ContactEditorSheet(contact: nil) { newContact in
-                contacts.append(newContact)
+            ContactPickerView { name, phone in
+                let contact = EmergencyContact(name: name, phone: phone)
+                contacts.append(contact)
                 saveContacts()
+                isAddingNew = false
             }
         }
         .fullScreenCover(isPresented: $showTestAlert) {
@@ -122,6 +125,52 @@ struct EmergencyContactsView: View {
     private func deleteContacts(at offsets: IndexSet) {
         contacts.remove(atOffsets: offsets)
         saveContacts()
+    }
+}
+
+// MARK: - Contact Picker (UIKit Bridge)
+
+/// Wraps `CNContactPickerViewController` for SwiftUI, returning the selected contact's name and phone number.
+private struct ContactPickerView: UIViewControllerRepresentable {
+    let onSelectContact: (String, String) -> Void
+
+    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+        let picker = CNContactPickerViewController()
+        picker.delegate = context.coordinator
+        picker.predicateForEnablingContact = NSPredicate(format: "phoneNumbers.@count > 0")
+        return picker
+    }
+
+    func updateUIViewController(_: CNContactPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelectContact: onSelectContact)
+    }
+
+    final class Coordinator: NSObject, CNContactPickerDelegate {
+        let onSelectContact: (String, String) -> Void
+
+        init(onSelectContact: @escaping (String, String) -> Void) {
+            self.onSelectContact = onSelectContact
+        }
+
+        func contactPicker(_: CNContactPickerViewController, didSelect contact: CNContact) {
+            let name = CNContactFormatter.string(from: contact, style: .fullName) ?? ""
+
+            // Prefer mobile number, fall back to first available
+            let phone: String
+            if let mobile = contact.phoneNumbers.first(where: { $0.label == CNLabelPhoneNumberMobile }) {
+                phone = mobile.value.stringValue
+            } else if let first = contact.phoneNumbers.first {
+                phone = first.value.stringValue
+            } else {
+                phone = ""
+            }
+
+            onSelectContact(name, phone)
+        }
+
+        func contactPickerDidCancel(_: CNContactPickerViewController) {}
     }
 }
 
