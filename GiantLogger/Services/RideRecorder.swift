@@ -38,6 +38,7 @@ class RideRecorder: ObservableObject {
     private var recordingStartDate: Date?
     private var movingSpeedSum: Double = 0
     private var movingSpeedCount: Int = 0
+    private let watchConnectivity = WatchConnectivityManager.shared
 
     init() {
         UserDefaults.standard.register(defaults: ["autoRecord": true])
@@ -85,6 +86,13 @@ class RideRecorder: ObservableObject {
         if logWorkouts { workoutManager?.startWorkout() }
         liveActivityManager.startActivity()
 
+        // Notify Watch that recording started
+        watchConnectivity.sendTelemetry(
+            speed: 0, battery: bikeService?.rideData.batteryPercent ?? 0,
+            distance: 0, duration: 0, cadence: 0, watts: 0,
+            isRecording: true, bikeName: SharedBikeData.bikeName
+        )
+
         // Tick elapsed time every second
         durationTask = Task {
             while !Task.isCancelled {
@@ -110,6 +118,14 @@ class RideRecorder: ObservableObject {
         durationTask = nil
         isRecording = false
         liveActivityManager.endActivity()
+
+        // Notify Watch that recording stopped
+        watchConnectivity.sendTelemetry(
+            speed: 0, battery: bikeService?.rideData.batteryPercent ?? 0,
+            distance: accumulatedDistance, duration: elapsedSeconds,
+            cadence: 0, watts: 0,
+            isRecording: false, bikeName: SharedBikeData.bikeName
+        )
 
         // Discard rides where user hasn't moved (< 10m) or has no samples
         if let ride = currentRide {
@@ -224,6 +240,18 @@ class RideRecorder: ObservableObject {
             battery: bikeService.rideData.batteryPercent,
             avgSpeed: avg,
             power: bikeService.rideData.watts
+        )
+
+        // Send telemetry to Apple Watch
+        watchConnectivity.sendTelemetry(
+            speed: bikeService.rideData.speed,
+            battery: bikeService.rideData.batteryPercent,
+            distance: accumulatedDistance,
+            duration: elapsedSeconds,
+            cadence: bikeService.rideData.cadence,
+            watts: bikeService.rideData.watts,
+            isRecording: true,
+            bikeName: SharedBikeData.bikeName
         )
     }
 

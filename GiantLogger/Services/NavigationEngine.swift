@@ -81,6 +81,7 @@ class NavigationEngine: ObservableObject {
     private var destinationCoordinate: CLLocationCoordinate2D?
     private var lastUpdateLocation: CLLocation?
     private var routeCoordinates: [CLLocationCoordinate2D] = []
+    private let watchConnectivity = WatchConnectivityManager.shared
 
     private let arrivalThreshold: Double = 30 // meters
     private let offRouteThreshold: Double = 100 // meters
@@ -292,6 +293,17 @@ class NavigationEngine: ObservableObject {
             )
         } else {
             nextInstruction = nil
+        }
+
+        // Send navigation update to Apple Watch
+        if let instruction = currentInstruction {
+            watchConnectivity.sendNavigationUpdate(
+                instruction: instruction.maneuverType.rawValue,
+                distance: distanceToNextManeuver,
+                symbol: instruction.maneuverType.sfSymbol,
+                street: instruction.streetName,
+                isNavigating: true
+            )
         }
     }
 
@@ -668,6 +680,15 @@ class NavigationEngine: ObservableObject {
         rerouteFailed = false
         isOffRoute = false
         offRouteDistance = 0
+
+        // Notify Apple Watch that navigation ended
+        watchConnectivity.sendNavigationUpdate(
+            instruction: "",
+            distance: 0,
+            symbol: "arrow.up",
+            street: nil,
+            isNavigating: false
+        )
     }
 }
 
