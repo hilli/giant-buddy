@@ -1,0 +1,140 @@
+import SwiftUI
+import SwiftData
+import UniformTypeIdentifiers
+
+struct MyRoutesView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Route.createdDate, order: .reverse) private var routes: [Route]
+
+    @State private var showFileImporter = false
+    @State private var importError: String?
+    @State private var showImportError = false
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if routes.isEmpty {
+                    ContentUnavailableView(
+                        "No Routes Yet",
+                        systemImage: "map",
+                        description: Text("Import a GPX file to add your first route.")
+                    )
+                } else {
+                    List {
+                        ForEach(routes) { route in
+                            NavigationLink(destination: RouteMapView(route: route)) {
+                                RouteRowView(route: route)
+                            }
+                        }
+                        .onDelete(perform: deleteRoutes)
+                    }
+                }
+            }
+            .navigationTitle("My Routes")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showFileImporter = true
+                    } label: {
+                        Label("Import GPX", systemImage: "square.and.arrow.down")
+                    }
+                }
+            }
+            .fileImporter(
+                isPresented: $showFileImporter,
+                allowedContentTypes: [.xml, UTType(filenameExtension: "gpx") ?? .xml],
+                allowsMultipleSelection: false
+            ) { result in
+                handleFileImport(result)
+            }
+            .alert("Import Error", isPresented: $showImportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(importError ?? "An unknown error occurred.")
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing { url.stopAccessingSecurityScopedResource() }
+            }
+
+            do {
+                let data = try Data(contentsOf: url)
+                let route = try GPXParser.parse(data: data)
+                modelContext.insert(route)
+                try modelContext.save()
+            } catch {
+                importError = error.localizedDescription
+                showImportError = true
+            }
+
+        case .failure(let error):
+            importError = error.localizedDescription
+            showImportError = true
+        }
+    }
+
+    private func deleteRoutes(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(routes[index])
+        }
+    }
+}
+
+// MARK: - Route Row
+
+private struct RouteRowView: View {
+    let route: Route
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: sourceIcon)
+                .font(.title2)
+                .foregroundStyle(.secondary)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(route.name)
+                    .font(.headline)
+
+                HStack(spacing: 8) {
+                    Label(route.formattedDistance, systemImage: "arrow.left.and.right")
+                    Label(String(format: "%.0f m ↑", route.elevationGain), systemImage: "mountain.2")
+                    Label("\(route.sortedWaypoints.count) pts", systemImage: "mappin.and.ellipse")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if let lastRidden = route.lastRiddenDate {
+                    Text("Last ridden \(lastRidden, format: .relative(presentation: .named))")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var sourceIcon: String {
+        switch route.source {
+        case "gpx_import": return "doc.text"
+        case "ride_conversion": return "bicycle"
+        case "manual": return "pencil"
+        default: return "map"
+        }
+    }
+}
+
+#Preview {
+    MyRoutesView()
+        .modelContainer(for: [Route.self, RouteWaypoint.self], inMemory: true)
+}
