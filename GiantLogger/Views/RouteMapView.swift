@@ -7,11 +7,12 @@ struct RouteMapView: View {
     let route: Route
 
     @EnvironmentObject var bikeService: GiantBikeService
+    @EnvironmentObject var navigationEngine: NavigationEngine
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \Ride.startDate) private var rides: [Ride]
     @StateObject private var rangePredictor = RangePredictor()
 
     @State private var prediction: RangePredictor.RoutePrediction?
-    @State private var isNavigating = false
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var exportURL: RouteExportURL?
 
@@ -52,11 +53,6 @@ struct RouteMapView: View {
         }
         .sheet(item: $exportURL) { item in
             RouteShareSheet(activityItems: [item.url])
-        }
-        .fullScreenCover(isPresented: $isNavigating) {
-            NavigationStack {
-                ActiveNavigationView(route: route)
-            }
         }
     }
 
@@ -136,7 +132,11 @@ struct RouteMapView: View {
 
     private var startButton: some View {
         Button {
-            isNavigating = true
+            Task {
+                await navigationEngine.calculateDirections(for: route)
+            }
+            NotificationCenter.default.post(name: .switchToRideTab, object: nil)
+            dismiss()
         } label: {
             Label("Start Navigation", systemImage: "location.north.fill")
                 .font(.headline)
@@ -309,5 +309,6 @@ private extension String {
         RouteMapView(route: route)
     }
     .environmentObject(GiantBikeService())
+    .environmentObject(NavigationEngine())
     .modelContainer(for: [Route.self, RouteWaypoint.self, Ride.self, RideSample.self], inMemory: true)
 }

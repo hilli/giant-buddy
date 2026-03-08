@@ -56,11 +56,17 @@ class NavigationEngine: ObservableObject {
     @Published var rerouteFailed = false
     @Published var isOffRoute = false
     @Published var offRouteDistance: Double = 0
+    @Published var activeRoute: Route?
 
     // MARK: - Settings
 
-    var voiceGuidanceEnabled: Bool = true
-    var hapticFeedbackEnabled: Bool = true
+    @Published var voiceGuidanceEnabled: Bool = true
+    @Published var hapticFeedbackEnabled: Bool = true
+
+    // MARK: - Public State
+
+    /// The computed route coordinates for map display.
+    var navigationRouteCoordinates: [CLLocationCoordinate2D] { routeCoordinates }
 
     // MARK: - Private State
 
@@ -104,6 +110,7 @@ class NavigationEngine: ObservableObject {
     func calculateDirections(for route: Route) async {
         let waypoints = route.sortedWaypoints
         guard waypoints.count >= 2 else { directionsAvailable = false; return }
+        activeRoute = route
         destinationCoordinate = waypoints.last!.coordinate
 
         var allSteps: [MKRoute.Step] = []
@@ -651,6 +658,7 @@ class NavigationEngine: ObservableObject {
         } catch {
             print("NavigationEngine: Audio session deactivation failed: \(error.localizedDescription)")
         }
+        activeRoute = nil
         routeSteps = []
         routeCoordinates = []
         currentInstruction = nil

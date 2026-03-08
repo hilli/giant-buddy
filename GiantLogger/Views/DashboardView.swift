@@ -8,6 +8,7 @@ struct DashboardView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var rideRecorder: RideRecorder
     @EnvironmentObject var weatherManager: WeatherManager
+    @EnvironmentObject var navigationEngine: NavigationEngine
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -87,6 +88,11 @@ struct DashboardView: View {
         .task(id: locationManager.currentLocation) {
             if let location = locationManager.currentLocation {
                 await weatherManager.fetchWeather(for: location)
+            }
+        }
+        .onChange(of: locationManager.currentLocation) { _, newLocation in
+            if navigationEngine.activeRoute != nil, let loc = newLocation {
+                navigationEngine.updateLocation(loc)
             }
         }
         .onAppear {
@@ -256,8 +262,15 @@ struct DashboardView: View {
                 MapPolyline(coordinates: trailCoordinates)
                     .stroke(.blue, lineWidth: 2)
             }
+            if navigationEngine.activeRoute != nil {
+                let routeCoords = navigationEngine.navigationRouteCoordinates
+                if routeCoords.count >= 2 {
+                    MapPolyline(coordinates: routeCoords)
+                        .stroke(.red, lineWidth: 3)
+                }
+            }
         }
-        .frame(maxHeight: 80)
+        .frame(maxHeight: navigationEngine.activeRoute != nil ? 120 : 80)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .allowsHitTesting(false)
     }
@@ -393,16 +406,52 @@ struct DashboardView: View {
     @ViewBuilder
     private var miniMapSection: some View {
         if locationManager.currentLocation != nil {
-            Map(position: $mapCameraPosition) {
-                UserAnnotation()
-                if trailCoordinates.count >= 2 {
-                    MapPolyline(coordinates: trailCoordinates)
-                        .stroke(.blue, lineWidth: 3)
+            VStack(spacing: 8) {
+                // Navigation instruction card
+                if navigationEngine.activeRoute != nil {
+                    navigationCard
+                }
+
+                Map(position: $mapCameraPosition) {
+                    UserAnnotation()
+                    // Past ride trail in blue
+                    if trailCoordinates.count >= 2 {
+                        MapPolyline(coordinates: trailCoordinates)
+                            .stroke(.blue, lineWidth: 3)
+                    }
+                    // Upcoming route in red
+                    if navigationEngine.activeRoute != nil {
+                        let routeCoords = navigationEngine.navigationRouteCoordinates
+                        if routeCoords.count >= 2 {
+                            MapPolyline(coordinates: routeCoords)
+                                .stroke(.red, lineWidth: 4)
+                        }
+                        if let start = routeCoords.first {
+                            Annotation("Start", coordinate: start) {
+                                Image(systemName: "flag.fill")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                            }
+                        }
+                        if let end = routeCoords.last, routeCoords.count > 1 {
+                            Annotation("Finish", coordinate: end) {
+                                Image(systemName: "flag.checkered")
+                                    .foregroundStyle(.red)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                }
+                .frame(height: navigationEngine.activeRoute != nil ? 300 : 150)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .allowsHitTesting(navigationEngine.activeRoute != nil)
+                .mapControls {
+                    if navigationEngine.activeRoute != nil {
+                        MapUserLocationButton()
+                        MapCompass()
+                    }
                 }
             }
-            .frame(height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .allowsHitTesting(false)
         }
     }
 
@@ -421,6 +470,97 @@ struct DashboardView: View {
             .background(rideRecorder.isRecording ? Color.red : Color.accentColor)
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    // MARK: - Navigation Card
+
+    @ViewBuilder
+    private var navigationCard: some View {
+        VStack(spacing: 6) {
+            if let instruction = navigationEngine.currentInstruction {
+                HStack(spacing: 16) {
+                    Image(systemName: instruction.maneuverType.sfSymbol)
+                        .font(.system(size: 28, weight: .bold))
+                        .frame(width: 44)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(instruction.maneuverType.rawValue)
+                            .font(.headline)
+                        if let street = instruction.streetName {
+                            Text("onto \(street)")
+                                .font(.subheadline)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    Text(formattedDistance(navigationEngine.distanceToNextManeuver))
+                        .font(.title2.bold().monospacedDigit())
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(navigationEngine.distanceToNextManeuver < 100 ? Color.orange : Color.blue)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            if navigationEngine.isRerouting {
+                HStack(spacing: 8) {
+                    ProgressView().tint(.white)
+                    Text("Rerouting…").font(.subheadline.bold())
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(.orange)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            if navigationEngine.isOffRoute {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text("Off Route — \(Int(navigationEngine.offRouteDistance))m away")
+                        .font(.subheadline.bold())
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(.red)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            // Navigation controls
+            HStack {
+                Button {
+                    navigationEngine.voiceGuidanceEnabled.toggle()
+                    if !navigationEngine.voiceGuidanceEnabled { navigationEngine.stopVoice() }
+                } label: {
+                    Image(systemName: navigationEngine.voiceGuidanceEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                }
+
+                Button {
+                    navigationEngine.hapticFeedbackEnabled.toggle()
+                } label: {
+                    Image(systemName: navigationEngine.hapticFeedbackEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
+                }
+
+                Spacer()
+
+                Button("End Navigation") {
+                    navigationEngine.stop()
+                }
+                .foregroundStyle(.red)
+                .font(.subheadline.bold())
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func formattedDistance(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.1f km", meters / 1000)
+        } else {
+            return "\(Int(meters)) m"
         }
     }
 

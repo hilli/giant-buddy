@@ -11,6 +11,7 @@ struct GiantLoggerApp: App {
     @StateObject private var workoutManager = WorkoutManager()
     @StateObject private var crashDetector = CrashDetector()
     @StateObject private var stravaService = StravaService.shared
+    @StateObject private var navigationEngine = NavigationEngine()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([Ride.self, RideSample.self, Route.self, RouteWaypoint.self, MaintenanceItem.self, BatterySnapshot.self, ErrorLogEntry.self])
@@ -38,6 +39,7 @@ struct GiantLoggerApp: App {
                 .environmentObject(workoutManager)
                 .environmentObject(crashDetector)
                 .environmentObject(stravaService)
+                .environmentObject(navigationEngine)
                 .onOpenURL { url in
                     if url.scheme == "giantlogger" {
                         Task {
