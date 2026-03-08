@@ -3,6 +3,7 @@ import SwiftData
 import Combine
 import CoreLocation
 import ActivityKit
+import WidgetKit
 
 /// Records ride telemetry + GPS samples and manages ride lifecycle.
 @MainActor
@@ -133,6 +134,13 @@ class RideRecorder: ObservableObject {
                         try? await strava.uploadRide(rideToUpload)
                     }
                 }
+
+                SharedBikeData.lastRideDate = ride.startDate
+                SharedBikeData.lastRideDistance = ride.totalDistance
+                SharedBikeData.lastRideDuration = TimeInterval(ride.duration)
+                SharedBikeData.lastRideAvgSpeed = ride.avgSpeed
+                SharedBikeData.lastRideElevationGain = ride.elevationGain
+                WidgetCenter.shared.reloadAllTimelines()
             }
         }
         try? modelContext?.save()

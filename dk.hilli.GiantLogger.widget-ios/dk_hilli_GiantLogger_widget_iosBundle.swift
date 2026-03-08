@@ -12,8 +12,8 @@ import SwiftUI
 @main
 struct dk_hilli_GiantLogger_widget_iosBundle: WidgetBundle {
     var body: some Widget {
-        dk_hilli_GiantLogger_widget_ios()
-        dk_hilli_GiantLogger_widget_iosControl()
+        BatteryWidget()
+        LastRideWidget()
         RideLiveActivity()
     }
 }

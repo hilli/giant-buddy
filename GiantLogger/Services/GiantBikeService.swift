@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import OSLog
 import SwiftData
+import WidgetKit
 
 /// High-level interface to the Giant e-bike. Sends commands, parses responses,
 /// and publishes live telemetry data.
@@ -167,6 +168,13 @@ class GiantBikeService: ObservableObject {
             saveBikeInfo()
             recordBatterySnapshotIfNeeded()
             recordErrorCodesIfNeeded()
+            if let info = bikeInfo {
+                SharedBikeData.batteryPercent = info.epCapacityPercent
+                SharedBikeData.batteryHealth = info.epLifePercent
+                SharedBikeData.totalOdometer = Double(info.odo)
+                SharedBikeData.lastConnected = Date()
+                WidgetCenter.shared.reloadAllTimelines()
+            }
             isFetchingBikeInfo = false
             debugLog.log("GEV", "Bike data fetch complete")
         }
@@ -392,6 +400,10 @@ class GiantBikeService: ObservableObject {
             "Parsed battery data: capacity=\(batteryData.capacityPercent) life=\(batteryData.lifePercent)"
         )
         debugLog.log("GEV", "Battery: capacity=\(batteryData.capacityPercent)% life=\(batteryData.lifePercent)%")
+        SharedBikeData.batteryPercent = batteryData.capacityPercent
+        SharedBikeData.batteryHealth = batteryData.lifePercent
+        SharedBikeData.lastConnected = Date()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func handleDiagnosticSyncDrive(_ plaintext: [UInt8]) {
