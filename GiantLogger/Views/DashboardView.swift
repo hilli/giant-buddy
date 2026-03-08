@@ -336,7 +336,7 @@ struct DashboardView: View {
             GridItem(.flexible()),
             GridItem(.flexible()),
             GridItem(.flexible()),
-            GridItem(.flexible()),
+            GridItem(.flexible())
         ], spacing: 12) {
             MetricCard(
                 title: "Power",

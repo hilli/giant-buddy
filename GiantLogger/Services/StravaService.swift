@@ -97,7 +97,7 @@ class StravaService: NSObject, ObservableObject {
             "client_id": StravaSecrets.clientID,
             "client_secret": StravaSecrets.clientSecret,
             "code": code,
-            "grant_type": "authorization_code",
+            "grant_type": "authorization_code"
         ]
 
         do {
@@ -135,7 +135,7 @@ class StravaService: NSObject, ObservableObject {
             "client_id": StravaSecrets.clientID,
             "client_secret": StravaSecrets.clientSecret,
             "refresh_token": tokens.refresh,
-            "grant_type": "refresh_token",
+            "grant_type": "refresh_token"
         ]
 
         let result = try await postTokenRequest(params)
@@ -238,7 +238,7 @@ class StravaService: NSObject, ObservableObject {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: "tokens",
+            kSecAttrAccount as String: "tokens"
         ]
         SecItemDelete(query as CFDictionary)
         var add = query
@@ -251,7 +251,7 @@ class StravaService: NSObject, ObservableObject {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
             kSecAttrAccount as String: "tokens",
-            kSecReturnData as String: true,
+            kSecReturnData as String: true
         ]
         var result: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
@@ -267,7 +267,7 @@ class StravaService: NSObject, ObservableObject {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: "tokens",
+            kSecAttrAccount as String: "tokens"
         ]
         SecItemDelete(query as CFDictionary)
     }

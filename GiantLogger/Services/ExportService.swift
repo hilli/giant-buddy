@@ -30,7 +30,7 @@ enum ExportService {
                 String(format: "%.1f", s.altitude),
                 String(format: "%.1f", s.gpsSpeed),
                 String(format: "%.0f", s.course),
-                "\"\(s.packetLog.replacingOccurrences(of: "\"", with: "\"\""))\"",
+                "\"\(s.packetLog.replacingOccurrences(of: "\"", with: "\"\""))\""
             ].joined(separator: ",")
         }
 

@@ -73,13 +73,13 @@ class RangePredictor: ObservableObject {
         "boost+": 2.2,
         "climb": 1.8,
         "climb+": 2.0,
-        "smart": 0.9,
+        "smart": 0.9
     ]
 
     /// Ordered from most efficient to most powerful for mode recommendation.
     private static let modesByEfficiency = [
         "eco", "tour", "smart", "normal", "tour+", "normal+",
-        "power", "power+", "climb", "climb+", "boost", "boost+",
+        "power", "power+", "climb", "climb+", "boost", "boost+"
     ]
 
     private static let userDefaultsKey = "rangePredictor.consumptionRates"

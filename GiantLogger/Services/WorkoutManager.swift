@@ -83,7 +83,7 @@ class WorkoutManager: ObservableObject {
 
     /// Add a GPS location to the workout route.
     func addRouteLocation(_ location: CLLocation) {
-        routeBuilder?.insertRouteData([location]) { [weak self] success, error in
+        routeBuilder?.insertRouteData([location]) { [weak self] _, error in
             if let error {
                 Task { @MainActor in
                     self?.debugLog.log("HK", "Route insert error: \(error.localizedDescription)")
@@ -135,7 +135,7 @@ class WorkoutManager: ObservableObject {
         // Step 1: Add all samples at once
         let addSamples = { (completion: @escaping () -> Void) in
             guard !samples.isEmpty else { completion(); return }
-            builder.add(samples) { [weak self] success, error in
+            builder.add(samples) { [weak self] _, error in
                 Task { @MainActor in
                     if let error {
                         self?.debugLog.log("HK", "Add samples FAILED: \(error.localizedDescription)")
@@ -219,7 +219,7 @@ class WorkoutManager: ObservableObject {
         let endDate = Date()
         let startDate = endDate.addingTimeInterval(-600) // 10 minutes ago
 
-        builder.beginCollection(withStart: startDate) { [weak self] success, error in
+        builder.beginCollection(withStart: startDate) { [weak self] _, error in
             if let error {
                 Task { @MainActor in
                     self?.debugLog.log("HK", "Sample begin FAILED: \(error.localizedDescription)")

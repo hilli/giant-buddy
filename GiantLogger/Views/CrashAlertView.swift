@@ -5,7 +5,7 @@ import CoreLocation
 /// Full-screen overlay displayed when a crash is detected.
 struct CrashAlertView: View {
     @ObservedObject var crashDetector: CrashDetector
-    var location: CLLocation? = nil
+    var location: CLLocation?
     @EnvironmentObject var locationManager: LocationManager
 
     @State private var pulseScale: CGFloat = 1.0

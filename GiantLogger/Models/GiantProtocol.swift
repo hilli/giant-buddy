@@ -69,7 +69,7 @@ enum GiantProtocol {
         [0x17, 0xCB, 0x16, 0x36, 0x14, 0xAB, 0x6A, 0xA3, 0xE8, 0x4D, 0x26, 0x87, 0x4C, 0x0F, 0xD3, 0x47],
         [0x2A, 0xF5, 0x57, 0x69, 0xAE, 0x8A, 0xC8, 0x0D, 0x3B, 0x45, 0xAD, 0xAF, 0x35, 0xED, 0xAA, 0x06],
         [0xE7, 0xC2, 0x2E, 0x96, 0xB0, 0x74, 0x71, 0x9C, 0xCF, 0x19, 0x16, 0x1C, 0x69, 0x41, 0x79, 0xF0],
-        [0x96, 0xB5, 0xF6, 0x8A, 0xAB, 0xDF, 0xE4, 0xB8, 0x7D, 0x6E, 0x65, 0x67, 0x51, 0xCD, 0xF3, 0x9E],
+        [0x96, 0xB5, 0xF6, 0x8A, 0xAB, 0xDF, 0xE4, 0xB8, 0x7D, 0x6E, 0x65, 0x67, 0x51, 0xCD, 0xF3, 0x9E]
     ]
 
     // MARK: - Packet Construction
@@ -136,7 +136,7 @@ enum GiantProtocol {
         .passiveRC1, .passiveRC2, .passiveRC3, .passiveRC4,
         .passiveSD1, .passiveSD2, .passiveSD3, .passiveSD4,
         .passiveEP1, .passiveEP2, .passiveEP3, .passiveEP4,
-        .bikeDataRideControl, .activeSyncDrive, .readBattery,
+        .bikeDataRideControl, .activeSyncDrive, .readBattery
     ]
 
     static func diagnosticEnergyPakCommand() -> Data {
@@ -584,7 +584,7 @@ struct RemainingRangeData: Equatable {
             ("Power", power), ("Power+", powerPlus),
             ("Boost", boost), ("Boost+", boostPlus),
             ("Climb", climb), ("Climb+", climbPlus),
-            ("Smart", smart),
+            ("Smart", smart)
         ]
         return all.filter { $0.1 > 0 }
     }
@@ -675,7 +675,7 @@ struct ModeUsageData: Codable, Equatable {
             ("Power", power), ("Power+", powerPlus),
             ("Boost", boost), ("Boost+", boostPlus),
             ("Climb", climb), ("Climb+", climbPlus),
-            ("Smart", smart), ("Off", off),
+            ("Smart", smart), ("Off", off)
         ]
         return all.filter { $0.1 > 0 }
     }

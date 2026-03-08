@@ -88,6 +88,6 @@ struct ElevationProfileView: View {
         ElevationPoint(distance: 1.5, altitude: 150),
         ElevationPoint(distance: 3.0, altitude: 120),
         ElevationPoint(distance: 5.0, altitude: 200),
-        ElevationPoint(distance: 7.0, altitude: 90),
+        ElevationPoint(distance: 7.0, altitude: 90)
     ])
 }

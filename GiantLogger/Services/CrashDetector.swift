@@ -55,7 +55,7 @@ class CrashDetector: ObservableObject {
         impactDetected = false
         recentMagnitudes = []
 
-        motionManager.startAccelerometerUpdates(to: motionQueue) { [weak self] data, error in
+        motionManager.startAccelerometerUpdates(to: motionQueue) { [weak self] data, _ in
             guard let self, let data else { return }
             let mag = Self.magnitude(data.acceleration)
 

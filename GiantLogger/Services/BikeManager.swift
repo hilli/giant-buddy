@@ -256,7 +256,7 @@ extension BikeManager: CBPeripheralDelegate {
                     let props = characteristic.properties
                     let propStr = [
                         props.contains(.write) ? "write" : nil,
-                        props.contains(.writeWithoutResponse) ? "writeNoResp" : nil,
+                        props.contains(.writeWithoutResponse) ? "writeNoResp" : nil
                     ].compactMap { $0 }.joined(separator: ",")
                     logger.debug("Found write characteristic (props: \(propStr, privacy: .public))")
                     debugLog.log("BLE", "Found write characteristic (props: \(propStr))")

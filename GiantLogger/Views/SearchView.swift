@@ -14,6 +14,7 @@ struct SearchView: View {
     @State private var favorites: [FavoritePlace] = []
     @State private var renamingFavorite: FavoritePlace?
     @State private var renameText = ""
+    @State private var searchTask: Task<Void, Never>?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -112,6 +113,19 @@ struct SearchView: View {
                 .submitLabel(.search)
                 .onSubmit {
                     performSearch()
+                }
+                .onChange(of: searchText) { _, newValue in
+                    searchTask?.cancel()
+                    guard !newValue.trimmingCharacters(in: .whitespaces).isEmpty else {
+                        searchService.searchResults = []
+                        return
+                    }
+                    activeCategory = nil
+                    searchTask = Task {
+                        try? await Task.sleep(for: .milliseconds(300))
+                        guard !Task.isCancelled else { return }
+                        await searchService.search(query: newValue, near: locationManager.currentLocation)
+                    }
                 }
             if !searchText.isEmpty {
                 Button {
