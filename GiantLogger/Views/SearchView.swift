@@ -11,6 +11,9 @@ struct SearchView: View {
     @State private var selectedResult: POISearchService.POIResult?
     @State private var showingMap = false
     @State private var activeCategory: POISearchService.POICategory?
+    @State private var favorites: [FavoritePlace] = []
+    @State private var renamingFavorite: FavoritePlace?
+    @State private var renameText = ""
 
     @Environment(\.dismiss) private var dismiss
 
@@ -39,6 +42,24 @@ struct SearchView: View {
                 .environmentObject(locationManager)
                 .environmentObject(navigationEngine)
             }
+            .onAppear { favorites = FavoritePlace.loadAll() }
+            .alert("Rename Favorite", isPresented: Binding(
+                get: { renamingFavorite != nil },
+                set: { if !$0 { renamingFavorite = nil } }
+            )) {
+                TextField("Name", text: $renameText)
+                Button("Save") {
+                    if let fav = renamingFavorite,
+                       let idx = favorites.firstIndex(where: { $0.id == fav.id }) {
+                        favorites[idx].name = renameText.trimmingCharacters(in: .whitespaces)
+                        FavoritePlace.saveAll(favorites)
+                    }
+                    renamingFavorite = nil
+                }
+                Button("Cancel", role: .cancel) { renamingFavorite = nil }
+            } message: {
+                Text("Enter a custom name like \"Home\" or \"Work\"")
+            }
         }
     }
 
@@ -47,6 +68,20 @@ struct SearchView: View {
     private var searchContent: some View {
         VStack(spacing: 0) {
             searchBar
+
+            if searchText.isEmpty && !favorites.isEmpty {
+                FavoritesSectionView(
+                    favorites: favorites,
+                    currentLocation: locationManager.currentLocation,
+                    onSelect: { fav in selectFavorite(fav) },
+                    onRename: { fav in
+                        renamingFavorite = fav
+                        renameText = fav.name
+                    },
+                    onRemove: { fav in removeFavorite(fav) }
+                )
+            }
+
             categoryButtons
 
             if searchService.isSearching {
@@ -140,6 +175,29 @@ struct SearchView: View {
                 POIResultRow(result: result)
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                if !favorites.contains(where: {
+                    $0.latitude == result.coordinate.latitude
+                        && $0.longitude == result.coordinate.longitude
+                }) {
+                    Button {
+                        addToFavorites(result)
+                    } label: {
+                        Label("Add to Favorites", systemImage: "star")
+                    }
+                } else {
+                    Button {
+                        if let idx = favorites.firstIndex(where: {
+                            $0.latitude == result.coordinate.latitude
+                                && $0.longitude == result.coordinate.longitude
+                        }) {
+                            removeFavorite(favorites[idx])
+                        }
+                    } label: {
+                        Label("Remove from Favorites", systemImage: "star.slash")
+                    }
+                }
+            }
         }
         .listStyle(.plain)
     }
@@ -172,9 +230,53 @@ struct SearchView: View {
         .listStyle(.plain)
     }
 
-    // MARK: - Empty State
+    // MARK: - Favorites Helpers
 
-    private var emptyState: some View {
+    private func selectFavorite(_ fav: FavoritePlace) {
+        let result = POISearchService.POIResult(
+            name: fav.originalName,
+            address: fav.address,
+            coordinate: fav.coordinate,
+            category: nil,
+            distance: locationManager.currentLocation.map { fav.distance(from: $0) },
+            mapItem: MKMapItem(placemark: MKPlacemark(coordinate: fav.coordinate))
+        )
+        selectedResult = result
+        searchService.searchResults = [result]
+        showingMap = true
+    }
+
+    private func addToFavorites(_ result: POISearchService.POIResult) {
+        let fav = FavoritePlace(
+            name: result.name,
+            originalName: result.name,
+            address: result.address,
+            latitude: result.coordinate.latitude,
+            longitude: result.coordinate.longitude
+        )
+        favorites.append(fav)
+        FavoritePlace.saveAll(favorites)
+    }
+
+    private func removeFavorite(_ fav: FavoritePlace) {
+        favorites.removeAll { $0.id == fav.id }
+        FavoritePlace.saveAll(favorites)
+    }
+
+    // MARK: - Helpers
+
+    private func performSearch() {
+        activeCategory = nil
+        Task {
+            await searchService.search(query: searchText, near: locationManager.currentLocation)
+        }
+    }
+}
+
+// MARK: - SearchView Subviews
+
+private extension SearchView {
+    var emptyState: some View {
         ContentUnavailableView(
             "Search Nearby",
             systemImage: "magnifyingglass",
@@ -182,9 +284,7 @@ struct SearchView: View {
         )
     }
 
-    // MARK: - Location Permission
-
-    private var locationPermissionView: some View {
+    var locationPermissionView: some View {
         ContentUnavailableView {
             Label("Location Required", systemImage: "location.slash")
         } description: {
@@ -194,15 +294,6 @@ struct SearchView: View {
                 locationManager.requestPermission()
             }
             .buttonStyle(.borderedProminent)
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func performSearch() {
-        activeCategory = nil
-        Task {
-            await searchService.search(query: searchText, near: locationManager.currentLocation)
         }
     }
 }
