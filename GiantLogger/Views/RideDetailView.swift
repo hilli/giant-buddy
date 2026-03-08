@@ -5,8 +5,10 @@ import Charts
 struct RideDetailView: View {
     let ride: Ride
     @EnvironmentObject var stravaService: StravaService
+    @Environment(\.modelContext) private var modelContext
     @State private var exportURL: IdentifiableURL?
     @State private var stravaUploadSuccess = false
+    @State private var savedAsRoute = false
 
     private var sortedSamples: [RideSample] {
         (ride.samples ?? []).sorted { $0.timestamp < $1.timestamp }
@@ -54,6 +56,14 @@ struct RideDetailView: View {
                     } label: {
                         Label("Export GPX", systemImage: "map")
                     }
+                    if !gpsCoordinates.isEmpty {
+                        Divider()
+                        Button {
+                            saveAsRoute()
+                        } label: {
+                            Label("Save as Route", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        }
+                    }
                     if stravaService.isConnected {
                         Divider()
                         Button {
@@ -86,6 +96,11 @@ struct RideDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Your ride has been uploaded to Strava.")
+        }
+        .alert("Saved as Route", isPresented: $savedAsRoute) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("This ride has been saved to My Routes.")
         }
     }
 
@@ -248,6 +263,30 @@ struct RideDetailView: View {
         let s = seconds % 60
         if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
         return String(format: "%d:%02d", m, s)
+    }
+
+    private func saveAsRoute() {
+        let gpsSamples = sortedSamples.filter { $0.latitude != 0 || $0.longitude != 0 }
+        guard !gpsSamples.isEmpty else { return }
+
+        let dateStr = ride.startDate.formatted(date: .abbreviated, time: .shortened)
+        let route = Route(name: "Ride \(dateStr)", source: "ride_conversion")
+
+        for (index, sample) in gpsSamples.enumerated() {
+            let wp = RouteWaypoint(
+                index: index,
+                latitude: sample.latitude,
+                longitude: sample.longitude,
+                altitude: sample.altitude,
+                timestamp: sample.timestamp
+            )
+            wp.route = route
+        }
+
+        route.recalculateStats()
+        modelContext.insert(route)
+        try? modelContext.save()
+        savedAsRoute = true
     }
 }
 

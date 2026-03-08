@@ -11,6 +11,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var hasConfigured = false
+    @State private var showSearch = false
 
     var body: some View {
         TabView {
@@ -19,9 +20,19 @@ struct ContentView: View {
                     Label("Ride", systemImage: "figure.outdoor.cycle")
                 }
 
+            MyRoutesView()
+                .tabItem {
+                    Label("My Routes", systemImage: "map")
+                }
+
             RideListView()
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
+                }
+
+            AnalyticsView()
+                .tabItem {
+                    Label("Analytics", systemImage: "chart.bar")
                 }
 
             ConnectionView()
@@ -33,6 +44,9 @@ struct ContentView: View {
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
+        }
+        .sheet(isPresented: $showSearch) {
+            SearchView()
         }
         .tint(.accentColor)
         .onAppear {
