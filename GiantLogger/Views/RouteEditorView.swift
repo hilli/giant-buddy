@@ -16,6 +16,8 @@ struct RouteEditorView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var calculationTask: Task<Void, Never>?
+    @State private var routeElevations: [Double] = []
+    @State private var routeCoordinates: [CLLocationCoordinate2D] = []
 
     // MARK: - EditableWaypoint
 
@@ -164,6 +166,8 @@ struct RouteEditorView: View {
             Button(role: .destructive) {
                 waypoints.removeAll()
                 calculatedLegs.removeAll()
+                routeCoordinates = []
+                routeElevations = []
             } label: {
                 Label("Clear All", systemImage: "trash")
             }
@@ -250,7 +254,13 @@ struct RouteEditorView: View {
     }
 
     private var formattedElevation: String {
-        "—" // MKRoute doesn't expose elevation data
+        guard !routeElevations.isEmpty else { return "—" }
+        var gain: Double = 0
+        for i in 1..<routeElevations.count {
+            let diff = routeElevations[i] - routeElevations[i - 1]
+            if diff > 0 { gain += diff }
+        }
+        return String(format: "%.0f m", gain)
     }
 
     // MARK: - Waypoint List
@@ -362,14 +372,65 @@ struct RouteEditorView: View {
 
             guard !Task.isCancelled else { return }
 
+            guard !Task.isCancelled else { return }
+
+            // Collect all polyline coordinates for elevation lookup
+            var allCoords: [CLLocationCoordinate2D] = []
+            if !failed {
+                for leg in legs {
+                    let polyline = leg.polyline
+                    let count = polyline.pointCount
+                    let coords = UnsafeMutablePointer<CLLocationCoordinate2D>.allocate(capacity: count)
+                    defer { coords.deallocate() }
+                    polyline.getCoordinates(coords, range: NSRange(location: 0, length: count))
+                    let legCoords = Array(UnsafeBufferPointer(start: coords, count: count))
+                    if allCoords.isEmpty {
+                        allCoords.append(contentsOf: legCoords)
+                    } else {
+                        allCoords.append(contentsOf: legCoords.dropFirst())
+                    }
+                }
+            }
+
+            // Fetch elevations for route coordinates
+            var elevations: [Double] = []
+            if !allCoords.isEmpty {
+                let sampleInterval = max(1, allCoords.count / 100)
+                let sampledCoords = stride(from: 0, to: allCoords.count, by: sampleInterval).map { allCoords[$0] }
+
+                if let sampled = try? await ElevationService.shared.fetchElevations(for: sampledCoords) {
+                    var full = [Double](repeating: 0, count: allCoords.count)
+                    for (sampleIdx, elev) in sampled.enumerated() {
+                        let coordIdx = sampleIdx * sampleInterval
+                        full[coordIdx] = elev
+                    }
+                    // Linear interpolation between sampled points
+                    for i in 0..<full.count where i % sampleInterval != 0 {
+                        let prevSample = (i / sampleInterval) * sampleInterval
+                        let nextSample = min(prevSample + sampleInterval, full.count - 1)
+                        if prevSample != nextSample {
+                            let t = Double(i - prevSample) / Double(nextSample - prevSample)
+                            full[i] = full[prevSample] + t * (full[nextSample] - full[prevSample])
+                        } else {
+                            full[i] = full[prevSample]
+                        }
+                    }
+                    elevations = full
+                }
+            }
+
             await MainActor.run {
                 isCalculating = false
                 if failed {
                     calculatedLegs.removeAll()
+                    routeCoordinates = []
+                    routeElevations = []
                     errorMessage = "Could not calculate directions between some waypoints. The route will be saved with straight-line segments."
                     showError = true
                 } else {
                     calculatedLegs = legs
+                    routeCoordinates = allCoords
+                    routeElevations = elevations
                 }
             }
         }
@@ -383,25 +444,29 @@ struct RouteEditorView: View {
 
         var routeWaypoints: [RouteWaypoint] = []
 
-        if !calculatedLegs.isEmpty {
-            // Use detailed polyline points from all legs
-            var allPoints: [(CLLocationCoordinate2D)] = []
+        if !routeCoordinates.isEmpty {
+            // Use pre-collected polyline coordinates with elevation data
+            for (idx, coord) in routeCoordinates.enumerated() {
+                let altitude = idx < routeElevations.count ? routeElevations[idx] : 0
+                let wp = RouteWaypoint(index: idx, latitude: coord.latitude, longitude: coord.longitude, altitude: altitude)
+                routeWaypoints.append(wp)
+            }
+        } else if !calculatedLegs.isEmpty {
+            // Fallback: extract from legs without elevation
+            var allPoints: [CLLocationCoordinate2D] = []
             for leg in calculatedLegs {
                 let polyline = leg.polyline
                 let count = polyline.pointCount
                 let coords = UnsafeMutablePointer<CLLocationCoordinate2D>.allocate(capacity: count)
                 defer { coords.deallocate() }
                 polyline.getCoordinates(coords, range: NSRange(location: 0, length: count))
-
                 let legCoords = Array(UnsafeBufferPointer(start: coords, count: count))
-                // Skip the first point of subsequent legs to avoid duplicates at joins
                 if allPoints.isEmpty {
                     allPoints.append(contentsOf: legCoords)
                 } else {
                     allPoints.append(contentsOf: legCoords.dropFirst())
                 }
             }
-
             for (idx, coord) in allPoints.enumerated() {
                 let wp = RouteWaypoint(index: idx, latitude: coord.latitude, longitude: coord.longitude)
                 routeWaypoints.append(wp)

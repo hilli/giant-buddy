@@ -15,6 +15,7 @@ struct RouteMapView: View {
     @State private var prediction: RangePredictor.RoutePrediction?
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var exportURL: RouteExportURL?
+    @Environment(\.modelContext) private var modelContext
 
     private var sortedWaypoints: [RouteWaypoint] {
         route.sortedWaypoints
@@ -41,6 +42,22 @@ struct RouteMapView: View {
             let battery = bikeService.rideData.batteryPercent
             let currentBattery = battery > 0 ? battery : 100
             prediction = rangePredictor.predict(route: route, currentBattery: currentBattery)
+
+            // Auto-enrich routes that have no elevation data
+            let waypoints = route.sortedWaypoints
+            let hasElevation = waypoints.contains { $0.altitude != 0 }
+            if !hasElevation && waypoints.count >= 2 {
+                let coords = waypoints.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+                if let elevations = try? await ElevationService.shared.fetchElevations(for: coords) {
+                    for (i, wp) in waypoints.enumerated() where i < elevations.count {
+                        wp.altitude = elevations[i]
+                    }
+                    route.recalculateStats()
+                    try? modelContext.save()
+                    // Refresh range prediction with new elevation data
+                    prediction = rangePredictor.predict(route: route, currentBattery: currentBattery)
+                }
+            }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
