@@ -504,24 +504,38 @@ class GiantBikeService: ObservableObject {
         guard let ctx = modelContext, let info = bikeInfo else { return }
         let odo = Double(info.odo)
 
+        let lastKey = "lastErrorLogOdometer"
+        let lastOdo = UserDefaults.standard.double(forKey: lastKey)
+        guard odo != lastOdo else { return }
+
         func hasError(_ code: String) -> Bool {
             !code.isEmpty && !code.allSatisfy({ $0 == "0" })
         }
 
+        var logged = false
         if hasError(info.motorErrorCode1) {
             ctx.insert(ErrorLogEntry(source: "motor", errorCode: info.motorErrorCode1, odometer: odo))
+            logged = true
         }
         if hasError(info.motorErrorCode2) {
             ctx.insert(ErrorLogEntry(source: "motor", errorCode: info.motorErrorCode2, odometer: odo))
+            logged = true
         }
         if hasError(info.rcErrorCode) {
             ctx.insert(ErrorLogEntry(source: "rideControl", errorCode: info.rcErrorCode, odometer: odo))
+            logged = true
         }
         if hasError(info.rcNode2ErrorCode) {
             ctx.insert(ErrorLogEntry(source: "rideControl", errorCode: info.rcNode2ErrorCode, odometer: odo))
+            logged = true
         }
         if hasError(info.epErrorCode) {
             ctx.insert(ErrorLogEntry(source: "energyPak", errorCode: info.epErrorCode, odometer: odo))
+            logged = true
+        }
+
+        if logged {
+            UserDefaults.standard.set(odo, forKey: lastKey)
         }
     }
 }

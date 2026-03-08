@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 import CoreMotion
 import AudioToolbox
 import UIKit
@@ -34,6 +35,7 @@ class CrashDetector: ObservableObject {
     private let countdownDuration: Int = 60
 
     var isTestMode = false
+    var locationProvider: (() -> CLLocation?)?
 
     init() {
         motionManager = CMMotionManager()
@@ -147,14 +149,12 @@ class CrashDetector: ObservableObject {
 
     private func evaluatePostImpact() {
         let variance = Self.computeVariance(recentMagnitudes)
+        impactDetected = false
+        recentMagnitudes = []
 
         if variance < varianceThreshold {
             // Device is stationary → likely a crash
             startCountdown()
-        } else {
-            // Device is moving → rider is OK
-            impactDetected = false
-            recentMagnitudes = []
         }
     }
 
@@ -180,7 +180,8 @@ class CrashDetector: ObservableObject {
                     isTestMode = false
                     isCrashDetected = false
                 } else {
-                    // Actual emergency — handled externally via published state
+                    // Actual emergency — send alert
+                    sendEmergencyAlert(location: locationProvider?())
                 }
             }
         }

@@ -395,6 +395,7 @@
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides, even when the app is in the background.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Giant Buddy uses motion data to detect potential crashes while riding and alert your emergency contacts.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -489,6 +490,7 @@
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides, even when the app is in the background.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Giant Logger uses your location to record GPS tracks during rides.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Giant Buddy uses motion data to detect potential crashes while riding and alert your emergency contacts.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var rideRecorder: RideRecorder
     @EnvironmentObject var workoutManager: WorkoutManager
+    @EnvironmentObject var crashDetector: CrashDetector
     @EnvironmentObject var stravaService: StravaService
     @Environment(\.modelContext) private var modelContext
 
@@ -57,7 +58,18 @@ struct ContentView: View {
         .sheet(isPresented: $showSearch) {
             SearchView()
         }
+        .fullScreenCover(isPresented: $crashDetector.isCrashDetected) {
+            CrashAlertView(crashDetector: crashDetector, location: locationManager.currentLocation)
+        }
         .tint(.accentColor)
+        .onChange(of: rideRecorder.isRecording) { _, isRecording in
+            let enabled = UserDefaults.standard.bool(forKey: "crashDetectionEnabled")
+            if isRecording && enabled {
+                crashDetector.startMonitoring()
+            } else {
+                crashDetector.stopMonitoring()
+            }
+        }
         .onAppear {
             if !hasConfigured {
                 bikeService.attach(to: bikeManager)
@@ -71,6 +83,9 @@ struct ContentView: View {
                 )
                 if UserDefaults.standard.bool(forKey: "logWorkouts") {
                     workoutManager.requestAuthorization()
+                }
+                crashDetector.locationProvider = { [weak locationManager] in
+                    locationManager?.currentLocation
                 }
                 hasConfigured = true
             }

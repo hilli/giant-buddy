@@ -1,9 +1,11 @@
 import SwiftUI
 import AudioToolbox
+import CoreLocation
 
 /// Full-screen overlay displayed when a crash is detected.
 struct CrashAlertView: View {
     @ObservedObject var crashDetector: CrashDetector
+    var location: CLLocation? = nil
     @EnvironmentObject var locationManager: LocationManager
 
     @State private var pulseScale: CGFloat = 1.0
@@ -85,7 +87,7 @@ struct CrashAlertView: View {
         }
         .onChange(of: crashDetector.countdownSeconds) { _, newValue in
             if newValue <= 0, !crashDetector.isTestMode {
-                crashDetector.sendEmergencyAlert(location: locationManager.currentLocation)
+                crashDetector.sendEmergencyAlert(location: location ?? locationManager.currentLocation)
             }
         }
     }

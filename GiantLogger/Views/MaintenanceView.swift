@@ -86,7 +86,8 @@ struct MaintenanceView: View {
             Text("Components")
         } footer: {
             if remindersEnabled {
-                Text("You'll receive a notification when a component approaches its service interval.")
+                // TODO: Notification scheduling not yet implemented
+                Text("Notification reminders coming in a future update.")
             }
         }
     }
