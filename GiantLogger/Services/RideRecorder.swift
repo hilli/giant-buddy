@@ -35,6 +35,8 @@ class RideRecorder: ObservableObject {
     private var accumulatedDistance: Double = 0  // km
     private var lastSampleLocation: (lat: Double, lon: Double)?
     private var recordingStartDate: Date?
+    private var movingSpeedSum: Double = 0
+    private var movingSpeedCount: Int = 0
 
     init() {
         UserDefaults.standard.register(defaults: ["autoRecord": true])
@@ -75,6 +77,8 @@ class RideRecorder: ObservableObject {
         accumulatedDistance = 0
         lastSampleLocation = nil
         recordingStartDate = Date()
+        movingSpeedSum = 0
+        movingSpeedCount = 0
 
         locationManager?.startTracking()
         if logWorkouts { workoutManager?.startWorkout() }
@@ -199,9 +203,12 @@ class RideRecorder: ObservableObject {
             workoutManager?.addRouteLocation(location)
         }
 
-        // Update Live Activity with current telemetry
-        let movingSamples = (currentRide.samples ?? []).filter { $0.speed > 0.5 }
-        let avg = movingSamples.isEmpty ? 0.0 : movingSamples.map(\.speed).reduce(0, +) / Double(movingSamples.count)
+        // Update running average speed (O(1) instead of O(n))
+        if sample.speed > 0.5 {
+            movingSpeedSum += sample.speed
+            movingSpeedCount += 1
+        }
+        let avg = movingSpeedCount > 0 ? movingSpeedSum / Double(movingSpeedCount) : 0
         liveActivityManager.updateActivity(
             speed: bikeService.rideData.speed,
             distance: accumulatedDistance,

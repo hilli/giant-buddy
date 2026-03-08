@@ -11,7 +11,20 @@ class LiveActivityManager: ObservableObject {
     private var currentActivity: Activity<RideActivityAttributes>?
     private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "LiveActivity")
 
+    func cleanupStaleActivities() {
+        for activity in Activity<RideActivityAttributes>.activities {
+            Task {
+                await activity.end(
+                    ActivityContent(state: activity.content.state, staleDate: nil),
+                    dismissalPolicy: .immediate
+                )
+            }
+        }
+    }
+
     func startActivity() {
+        cleanupStaleActivities()
+
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             logger.info("Live Activities are disabled by the user")
             return

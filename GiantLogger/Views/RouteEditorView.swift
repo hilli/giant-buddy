@@ -74,6 +74,7 @@ struct RouteEditorView: View {
         } message: {
             Text(errorMessage ?? "Could not calculate cycling directions for this route.")
         }
+        .onDisappear { calculationTask?.cancel() }
     }
 
     // MARK: - Map
@@ -249,12 +250,7 @@ struct RouteEditorView: View {
     }
 
     private var formattedElevation: String {
-        if !calculatedLegs.isEmpty {
-            let totalAscent = calculatedLegs.compactMap(\.expectedTravelTime).reduce(0, +)
-            // MKRoute doesn't expose elevation; use "—" when no data
-            return "—"
-        }
-        return "—"
+        "—" // MKRoute doesn't expose elevation data
     }
 
     // MARK: - Waypoint List
@@ -385,6 +381,8 @@ struct RouteEditorView: View {
         let name = routeName.trimmingCharacters(in: .whitespacesAndNewlines)
         let route = Route(name: name.isEmpty ? "Untitled Route" : name, source: "manual")
 
+        var routeWaypoints: [RouteWaypoint] = []
+
         if !calculatedLegs.isEmpty {
             // Use detailed polyline points from all legs
             var allPoints: [(CLLocationCoordinate2D)] = []
@@ -406,15 +404,17 @@ struct RouteEditorView: View {
 
             for (idx, coord) in allPoints.enumerated() {
                 let wp = RouteWaypoint(index: idx, latitude: coord.latitude, longitude: coord.longitude)
-                route.waypoints?.append(wp)
+                routeWaypoints.append(wp)
             }
         } else {
             // Fallback: use tapped waypoints directly
             for (idx, wp) in waypoints.enumerated() {
                 let rwp = RouteWaypoint(index: idx, latitude: wp.coordinate.latitude, longitude: wp.coordinate.longitude)
-                route.waypoints?.append(rwp)
+                routeWaypoints.append(rwp)
             }
         }
+
+        route.waypoints = routeWaypoints
 
         route.recalculateStats()
         modelContext.insert(route)

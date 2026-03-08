@@ -195,7 +195,15 @@ class RangePredictor: ObservableObject {
             let curr = CLLocation(latitude: waypoints[i].latitude, longitude: waypoints[i].longitude)
             let segmentDistance = curr.distance(from: prev) / 1000.0 // km
 
-            guard segmentDistance > 0 else { continue }
+            guard segmentDistance > 0 else {
+                segments.append(PredictionSegment(
+                    distance: cumulativeDistance,
+                    altitude: waypoints[i].altitude,
+                    predictedBattery: battery,
+                    status: SegmentStatus(battery: battery)
+                ))
+                continue
+            }
 
             cumulativeDistance += segmentDistance
 

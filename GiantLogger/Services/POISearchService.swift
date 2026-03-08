@@ -102,12 +102,14 @@ class POISearchService: ObservableObject {
 
         do {
             let response = try await search.start()
+            guard currentSearch === search else { return }
             let results = response.mapItems.map { item in
                 makeResult(from: item, category: nil, userLocation: location)
             }
             searchResults = sortedByDistance(results)
             addToRecents(trimmed)
         } catch {
+            guard currentSearch === search else { return }
             if (error as NSError).code != MKError.placemarkNotFound.rawValue {
                 print("POISearchService: search error – \(error.localizedDescription)")
             }
@@ -137,11 +139,13 @@ class POISearchService: ObservableObject {
 
         do {
             let response = try await search.start()
+            guard currentSearch === search else { return }
             let results = response.mapItems.map { item in
                 makeResult(from: item, category: category, userLocation: location)
             }
             searchResults = sortedByDistance(results)
         } catch {
+            guard currentSearch === search else { return }
             if (error as NSError).code != MKError.placemarkNotFound.rawValue {
                 print("POISearchService: category search error – \(error.localizedDescription)")
             }

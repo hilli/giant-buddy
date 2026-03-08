@@ -216,7 +216,7 @@ struct RouteMapView: View {
         <gpx version="1.1" creator="Giant Buddy"
           xmlns="http://www.topografix.com/GPX/1/1">
           <trk>
-            <name>\(route.name)</name>
+            <name>\(route.name.xmlEscaped)</name>
             <trkseg>
 
         """
@@ -228,7 +228,7 @@ struct RouteMapView: View {
                 gpx += "        <time>\(formatter.string(from: time))</time>\n"
             }
             if let name = waypoint.name {
-                gpx += "        <name>\(name)</name>\n"
+                gpx += "        <name>\(name.xmlEscaped)</name>\n"
             }
             gpx += "      </trkpt>\n"
         }
@@ -239,8 +239,14 @@ struct RouteMapView: View {
         </gpx>
         """
 
+        let safeName = route.name
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let filename = safeName.isEmpty ? "route" : safeName
+
         let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(route.name).gpx")
+            .appendingPathComponent("\(filename).gpx")
         try? gpx.write(to: tempURL, atomically: true, encoding: .utf8)
         exportURL = RouteExportURL(url: tempURL)
     }
@@ -285,6 +291,16 @@ private struct RouteShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private extension String {
+    var xmlEscaped: String {
+        self.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+    }
 }
 
 #Preview {

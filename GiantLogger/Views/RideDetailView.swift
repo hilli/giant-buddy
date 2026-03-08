@@ -272,6 +272,7 @@ struct RideDetailView: View {
         let dateStr = ride.startDate.formatted(date: .abbreviated, time: .shortened)
         let route = Route(name: "Ride \(dateStr)", source: "ride_conversion")
 
+        var waypoints: [RouteWaypoint] = []
         for (index, sample) in gpsSamples.enumerated() {
             let wp = RouteWaypoint(
                 index: index,
@@ -281,7 +282,9 @@ struct RideDetailView: View {
                 timestamp: sample.timestamp
             )
             wp.route = route
+            waypoints.append(wp)
         }
+        route.waypoints = waypoints
 
         route.recalculateStats()
         modelContext.insert(route)
