@@ -16,6 +16,7 @@ struct DashboardView: View {
     @State private var showSearch = false
     @State private var lastWeatherFetchLocation: CLLocation?
     @State private var lastWeatherFetchTime: Date?
+    @State private var showStopConfirmation = false
 
     private var isLandscape: Bool {
         verticalSizeClass == .compact
@@ -111,7 +112,8 @@ struct DashboardView: View {
             }
         }
         .onChange(of: locationManager.currentLocation) { _, newLocation in
-            if navigationEngine.activeRoute != nil, let loc = newLocation {
+            guard let loc = newLocation else { return }
+            if navigationEngine.activeRoute != nil {
                 navigationEngine.updateLocation(loc)
                 // Refresh weather every 10km or 30min during navigation
                 let needsRefresh: Bool = {
@@ -128,6 +130,12 @@ struct DashboardView: View {
                         await weatherManager.refresh(for: loc)
                     }
                 }
+            } else {
+                // Follow user position when not navigating
+                mapCameraPosition = .camera(MapCamera(
+                    centerCoordinate: loc.coordinate,
+                    distance: 1000
+                ))
             }
         }
         .onAppear {
@@ -492,7 +500,11 @@ struct DashboardView: View {
 
     private var recordButton: some View {
         Button {
-            rideRecorder.toggleRecording()
+            if rideRecorder.isRecording {
+                showStopConfirmation = true
+            } else {
+                rideRecorder.startRecording()
+            }
         } label: {
             HStack {
                 Image(systemName: rideRecorder.isRecording ? "stop.circle.fill" : "record.circle")
@@ -505,6 +517,14 @@ struct DashboardView: View {
             .background(rideRecorder.isRecording ? Color.red : Color.accentColor)
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .alert("Stop Recording?", isPresented: $showStopConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Stop", role: .destructive) {
+                rideRecorder.stopRecording()
+            }
+        } message: {
+            Text("Are you sure you want to stop recording this ride?")
         }
     }
 

@@ -29,10 +29,15 @@ class CrashDetector: ObservableObject {
     private var recentMagnitudes: [Double] = []
     private var impactDetected = false
 
-    private let impactThreshold: Double = 3.0  // g-force
-    private let postImpactWait: TimeInterval = 10.0
+    private let impactThreshold: Double = 6.0  // g-force
+    private let postImpactWait: TimeInterval = 3.0  // brief stillness check
     private let varianceThreshold: Double = 0.05
     private let countdownDuration: Int = 60
+    private let requiredImpactSamples: Int = 2
+    private let impactWindowDuration: TimeInterval = 1.0
+
+    // Timestamps of recent above-threshold samples for multi-sample confirmation
+    private var impactTimestamps: [Date] = []
 
     var isTestMode = false
     var locationProvider: (() -> CLLocation?)?
@@ -54,6 +59,7 @@ class CrashDetector: ObservableObject {
         isMonitoring = true
         impactDetected = false
         recentMagnitudes = []
+        impactTimestamps = []
 
         motionManager.startAccelerometerUpdates(to: motionQueue) { [weak self] data, _ in
             guard let self, let data else { return }
@@ -70,6 +76,7 @@ class CrashDetector: ObservableObject {
         isMonitoring = false
         impactDetected = false
         recentMagnitudes = []
+        impactTimestamps = []
         cancelCountdown()
     }
 
@@ -79,6 +86,7 @@ class CrashDetector: ObservableObject {
         isCrashDetected = false
         impactDetected = false
         recentMagnitudes = []
+        impactTimestamps = []
     }
 
     /// Send emergency alert with current GPS coordinates.
@@ -135,14 +143,22 @@ class CrashDetector: ObservableObject {
         }
 
         if magnitude > impactThreshold {
-            impactDetected = true
-            recentMagnitudes = []
-            lastSignificantMotionDate = Date()
+            let now = Date()
+            impactTimestamps.append(now)
+            // Keep only timestamps within the sliding window
+            impactTimestamps = impactTimestamps.filter { now.timeIntervalSince($0) <= impactWindowDuration }
 
-            postImpactTask = Task {
-                try? await Task.sleep(for: .seconds(postImpactWait))
-                guard !Task.isCancelled else { return }
-                evaluatePostImpact()
+            if impactTimestamps.count >= requiredImpactSamples {
+                impactDetected = true
+                impactTimestamps = []
+                recentMagnitudes = []
+                lastSignificantMotionDate = now
+
+                postImpactTask = Task {
+                    try? await Task.sleep(for: .seconds(postImpactWait))
+                    guard !Task.isCancelled else { return }
+                    evaluatePostImpact()
+                }
             }
         }
     }

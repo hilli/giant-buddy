@@ -82,7 +82,7 @@ struct ActiveNavigationView: View {
             locationManager.startTracking()
             updateNavigation()
             Task {
-                await navigationEngine.calculateDirections(for: route)
+                await navigationEngine.calculateDirections(for: route, from: locationManager.currentLocation)
             }
         }
         .onDisappear {

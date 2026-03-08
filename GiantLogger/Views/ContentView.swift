@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var hasConfigured = false
     @State private var showSearch = false
     @State private var selectedTab = 0
+    @AppStorage("crashDetectionEnabled") private var crashDetectionEnabled = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -68,6 +69,15 @@ struct ContentView: View {
                 crashDetector.startMonitoring()
             } else {
                 crashDetector.stopMonitoring()
+            }
+        }
+        .onChange(of: crashDetectionEnabled) { _, enabled in
+            if rideRecorder.isRecording {
+                if enabled {
+                    crashDetector.startMonitoring()
+                } else {
+                    crashDetector.stopMonitoring()
+                }
             }
         }
         .onAppear {

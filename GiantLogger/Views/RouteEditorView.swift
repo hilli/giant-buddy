@@ -475,11 +475,25 @@ struct RouteEditorView: View {
             // Fallback: use tapped waypoints directly
             for (idx, wp) in waypoints.enumerated() {
                 let rwp = RouteWaypoint(index: idx, latitude: wp.coordinate.latitude, longitude: wp.coordinate.longitude)
+                rwp.isKeyWaypoint = true
                 routeWaypoints.append(rwp)
             }
         }
 
         route.waypoints = routeWaypoints
+
+        // Mark user-tapped positions as key waypoints for navigation
+        for tappedWP in waypoints {
+            let tappedLoc = CLLocation(latitude: tappedWP.coordinate.latitude,
+                                       longitude: tappedWP.coordinate.longitude)
+            if let closest = routeWaypoints.min(by: { wp1, wp2 in
+                let loc1 = CLLocation(latitude: wp1.latitude, longitude: wp1.longitude)
+                let loc2 = CLLocation(latitude: wp2.latitude, longitude: wp2.longitude)
+                return loc1.distance(from: tappedLoc) < loc2.distance(from: tappedLoc)
+            }) {
+                closest.isKeyWaypoint = true
+            }
+        }
 
         route.recalculateStats()
         modelContext.insert(route)

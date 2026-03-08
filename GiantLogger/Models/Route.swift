@@ -36,6 +36,16 @@ final class Route {
         sortedWaypoints.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
     }
 
+    /// Key waypoints used for turn-by-turn navigation directions.
+    /// Returns user-defined waypoints if available, otherwise falls back to start and end.
+    var navigationWaypoints: [RouteWaypoint] {
+        let keyWPs = sortedWaypoints.filter { $0.isKeyWaypoint }
+        if keyWPs.count >= 2 { return keyWPs }
+        let sorted = sortedWaypoints
+        guard sorted.count >= 2 else { return sorted }
+        return [sorted.first!, sorted.last!]
+    }
+
     var startCoordinate: CLLocationCoordinate2D? {
         sortedWaypoints.first.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
     }
@@ -113,6 +123,10 @@ final class RouteWaypoint {
         self.name = name
         self.timestamp = timestamp
     }
+
+    /// True for user-defined navigation waypoints (e.g. tapped points in route editor).
+    /// False for interpolated polyline coordinates used for display/elevation.
+    var isKeyWaypoint: Bool = false
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)

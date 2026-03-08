@@ -7,6 +7,7 @@ struct RouteMapView: View {
     let route: Route
 
     @EnvironmentObject var bikeService: GiantBikeService
+    @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var navigationEngine: NavigationEngine
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Ride.startDate) private var rides: [Ride]
@@ -102,7 +103,24 @@ struct RouteMapView: View {
                         .font(.title2)
                 }
             }
+
+            if let userLocation = locationManager.currentLocation {
+                Annotation("You", coordinate: userLocation.coordinate) {
+                    ZStack {
+                        Circle()
+                            .fill(.blue.opacity(0.25))
+                            .frame(width: 28, height: 28)
+                        Circle()
+                            .fill(.blue)
+                            .frame(width: 14, height: 14)
+                        Circle()
+                            .stroke(.white, lineWidth: 2)
+                            .frame(width: 14, height: 14)
+                    }
+                }
+            }
         }
+        .onAppear { fitMapToRouteAndUser() }
         .frame(height: 350)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding()
@@ -150,7 +168,7 @@ struct RouteMapView: View {
     private var startButton: some View {
         Button {
             Task {
-                await navigationEngine.calculateDirections(for: route)
+                await navigationEngine.calculateDirections(for: route, from: locationManager.currentLocation)
             }
             NotificationCenter.default.post(name: .switchToRideTab, object: nil)
             dismiss()
@@ -177,6 +195,26 @@ struct RouteMapView: View {
     }
 
     // MARK: - Colored Route Segments
+
+    private func fitMapToRouteAndUser() {
+        var allCoords = coordinates
+        if let userCoord = locationManager.currentLocation?.coordinate {
+            allCoords.append(userCoord)
+        }
+        guard !allCoords.isEmpty else { return }
+
+        let lats = allCoords.map(\.latitude)
+        let lons = allCoords.map(\.longitude)
+        let center = CLLocationCoordinate2D(
+            latitude: (lats.min()! + lats.max()!) / 2,
+            longitude: (lons.min()! + lons.max()!) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((lats.max()! - lats.min()!) * 1.3, 0.005),
+            longitudeDelta: max((lons.max()! - lons.min()!) * 1.3, 0.005)
+        )
+        cameraPosition = .region(MKCoordinateRegion(center: center, span: span))
+    }
 
     private struct ColoredSegment: Identifiable {
         let id = UUID()
@@ -326,6 +364,7 @@ private extension String {
         RouteMapView(route: route)
     }
     .environmentObject(GiantBikeService())
+    .environmentObject(LocationManager())
     .environmentObject(NavigationEngine())
     .modelContainer(for: [Route.self, RouteWaypoint.self, Ride.self, RideSample.self], inMemory: true)
 }

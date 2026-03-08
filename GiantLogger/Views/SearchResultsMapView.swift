@@ -215,7 +215,7 @@ struct SearchResultsMapView: View {
         navRoute.recalculateStats()
 
         Task {
-            await navigationEngine.calculateDirections(for: navRoute)
+            await navigationEngine.calculateDirections(for: navRoute, from: locationManager.currentLocation)
         }
 
         NotificationCenter.default.post(name: .switchToRideTab, object: nil)

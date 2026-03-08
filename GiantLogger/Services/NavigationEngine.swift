@@ -107,27 +107,85 @@ class NavigationEngine: ObservableObject {
     // MARK: - Directions Calculation
 
     /// Calculate MKDirections for the given route, extracting turn-by-turn steps.
-    /// Calculates leg-by-leg directions between consecutive waypoints to support intermediate waypoints.
-    func calculateDirections(for route: Route) async {
-        let waypoints = route.sortedWaypoints
-        guard waypoints.count >= 2 else { directionsAvailable = false; return }
+    /// Routes between key navigation waypoints only, avoiding excessive API calls
+    /// for routes with many interpolated polyline coordinates.
+    /// When `userLocation` is provided, navigation starts from the closest key waypoint
+    /// with an initial leg from the user's position to that waypoint.
+    func calculateDirections(for route: Route, from userLocation: CLLocation? = nil) async {
+        let allWaypoints = route.sortedWaypoints
+        guard allWaypoints.count >= 2 else { directionsAvailable = false; return }
         activeRoute = route
-        destinationCoordinate = waypoints.last!.coordinate
+        destinationCoordinate = allWaypoints.last!.coordinate
+
+        // Use only key navigation waypoints for MKDirections routing
+        var navWaypoints = route.navigationWaypoints
+        guard navWaypoints.count >= 2 else { directionsAvailable = false; return }
+
+        // Determine which key waypoint to start from based on user proximity
+        let insertUserLeg: Bool
+        if let userLocation {
+            var closestIndex = 0
+            var closestDistance = Double.greatestFiniteMagnitude
+            for (idx, wp) in navWaypoints.enumerated() {
+                let dist = userLocation.distance(from: CLLocation(latitude: wp.latitude, longitude: wp.longitude))
+                if dist < closestDistance {
+                    closestDistance = dist
+                    closestIndex = idx
+                }
+            }
+            // If closest is the last waypoint, step back one so there's at least one leg
+            let startIndex = min(closestIndex, navWaypoints.count - 2)
+            navWaypoints = Array(navWaypoints[startIndex...])
+            insertUserLeg = true
+        } else {
+            insertUserLeg = false
+        }
 
         var allSteps: [MKRoute.Step] = []
         var allCoordinates: [CLLocationCoordinate2D] = []
+        let lastLegIndex = navWaypoints.count - 2
 
-        for i in 0..<(waypoints.count - 1) {
+        // First leg from user's current position to the closest key waypoint
+        if insertUserLeg, let userLocation {
+            let firstWP = navWaypoints.first!
             let request = MKDirections.Request()
-            request.source = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i].coordinate))
-            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i+1].coordinate))
+            request.source = MKMapItem(placemark: MKPlacemark(coordinate: userLocation.coordinate))
+            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: firstWP.coordinate))
+            request.transportType = .cycling
+
+            let directions = MKDirections(request: request)
+            if let response = try? await directions.calculate(),
+               let leg = response.routes.first {
+                var steps = leg.steps.filter { !$0.instructions.isEmpty }
+                // Filter intermediate arrive steps from the user-to-start leg
+                steps = steps.filter { step in
+                    let lower = step.instructions.lowercased()
+                    return !lower.contains("arrive") && !lower.contains("destination")
+                }
+                allSteps.append(contentsOf: steps)
+                allCoordinates.append(contentsOf: leg.polyline.coordinates)
+            }
+        }
+
+        for i in 0..<(navWaypoints.count - 1) {
+            let request = MKDirections.Request()
+            request.source = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i].coordinate))
+            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i+1].coordinate))
             request.transportType = .cycling
 
             let directions = MKDirections(request: request)
             do {
                 let response = try await directions.calculate()
                 if let route = response.routes.first {
-                    allSteps.append(contentsOf: route.steps.filter { !$0.instructions.isEmpty })
+                    var steps = route.steps.filter { !$0.instructions.isEmpty }
+                    // Remove intermediate "arrive" steps so navigation continues past mid-route waypoints
+                    if i < lastLegIndex {
+                        steps = steps.filter { step in
+                            let lower = step.instructions.lowercased()
+                            return !lower.contains("arrive") && !lower.contains("destination")
+                        }
+                    }
+                    allSteps.append(contentsOf: steps)
                     let coords = route.polyline.coordinates
                     if !allCoordinates.isEmpty && !coords.isEmpty {
                         allCoordinates.append(contentsOf: coords.dropFirst()) // avoid duplicate junction point
@@ -138,13 +196,20 @@ class NavigationEngine: ObservableObject {
             } catch {
                 // Try walking as fallback for this leg
                 let walkRequest = MKDirections.Request()
-                walkRequest.source = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i].coordinate))
-                walkRequest.destination = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i+1].coordinate))
+                walkRequest.source = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i].coordinate))
+                walkRequest.destination = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i+1].coordinate))
                 walkRequest.transportType = .walking
                 let walkDirections = MKDirections(request: walkRequest)
                 if let response = try? await walkDirections.calculate(),
                    let route = response.routes.first {
-                    allSteps.append(contentsOf: route.steps.filter { !$0.instructions.isEmpty })
+                    var steps = route.steps.filter { !$0.instructions.isEmpty }
+                    if i < lastLegIndex {
+                        steps = steps.filter { step in
+                            let lower = step.instructions.lowercased()
+                            return !lower.contains("arrive") && !lower.contains("destination")
+                        }
+                    }
+                    allSteps.append(contentsOf: steps)
                     let coords = route.polyline.coordinates
                     if !allCoordinates.isEmpty && !coords.isEmpty {
                         allCoordinates.append(contentsOf: coords.dropFirst())
