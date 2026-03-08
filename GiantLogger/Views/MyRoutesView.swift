@@ -10,6 +10,8 @@ struct MyRoutesView: View {
     @State private var showRouteEditor = false
     @State private var importError: String?
     @State private var showImportError = false
+    @State private var renamingRoute: Route?
+    @State private var renameText = ""
 
     var body: some View {
         NavigationStack {
@@ -26,8 +28,23 @@ struct MyRoutesView: View {
                             NavigationLink(destination: RouteMapView(route: route)) {
                                 RouteRowView(route: route)
                             }
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    renameText = route.name
+                                    renamingRoute = route
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    modelContext.delete(route)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
-                        .onDelete(perform: deleteRoutes)
                     }
                 }
             }
@@ -67,6 +84,21 @@ struct MyRoutesView: View {
             } message: {
                 Text(importError ?? "An unknown error occurred.")
             }
+            .alert("Rename Route", isPresented: Binding(
+                get: { renamingRoute != nil },
+                set: { if !$0 { renamingRoute = nil } }
+            )) {
+                TextField("Route name", text: $renameText)
+                Button("Cancel", role: .cancel) { renamingRoute = nil }
+                Button("Save") {
+                    if let route = renamingRoute, !renameText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        route.name = renameText.trimmingCharacters(in: .whitespaces)
+                    }
+                    renamingRoute = nil
+                }
+            } message: {
+                Text("Enter a new name for this route.")
+            }
         }
     }
 
@@ -95,12 +127,6 @@ struct MyRoutesView: View {
         case .failure(let error):
             importError = error.localizedDescription
             showImportError = true
-        }
-    }
-
-    private func deleteRoutes(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(routes[index])
         }
     }
 }
