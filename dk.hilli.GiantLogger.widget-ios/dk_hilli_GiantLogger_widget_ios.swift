@@ -79,6 +79,12 @@ struct BatteryWidgetView: View {
                 .font(.title.bold())
                 .foregroundStyle(batteryColor)
 
+            if entry.estimatedRange > 0 {
+                Label("\(entry.estimatedRange) km", systemImage: "bolt.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
             if let lastConnected = entry.lastConnected {
                 Text("\(lastConnected, style: .relative) ago")
                     .font(.caption2)

@@ -73,12 +73,16 @@ struct LastRideWidgetView: View {
                 Text(String(format: "%.1f km", entry.distance))
                     .font(.title2.bold())
 
-                Text(formatDuration(entry.duration))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "timer")
+                        .font(.caption2)
+                    Text(formatDuration(entry.duration))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
                 if let rideDate = entry.rideDate {
-                    Text(rideDate, style: .relative)
+                    Text("\(rideDate, style: .relative) ago")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
@@ -103,7 +107,7 @@ struct LastRideWidgetView: View {
                 }
 
                 if let rideDate = entry.rideDate {
-                    Text(rideDate, style: .relative)
+                    Text("\(rideDate, style: .relative) ago")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -163,7 +167,11 @@ struct LastRideWidgetView: View {
     private func formatDuration(_ seconds: TimeInterval) -> String {
         let h = Int(seconds) / 3600
         let m = (Int(seconds) % 3600) / 60
-        return h > 0 ? "\(h)h \(m)m" : "\(m)m"
+        if h > 0 {
+            return "\(h)h \(m)min"
+        } else {
+            return "\(m) min"
+        }
     }
 }
 
