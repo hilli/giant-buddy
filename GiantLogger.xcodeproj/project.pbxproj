@@ -11,6 +11,9 @@
 		2F1294DA2F5D7B29009FF090 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2F1294D92F5D7B29009FF090 /* SwiftUI.framework */; };
 		2F1294EB2F5D7B2A009FF090 /* dk.hilli.GiantLogger.widget-iosExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2F1294D52F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-iosExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2F1297672F5DBFF7009FF090 /* GiantLogger Watch App Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 2F12975D2F5DBFF5009FF090 /* GiantLogger Watch App Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2F54197A2F5F37FC00138852 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2F1294D72F5D7B29009FF090 /* WidgetKit.framework */; };
+		2F54197B2F5F37FC00138852 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2F1294D92F5D7B29009FF090 /* SwiftUI.framework */; };
+		2F5419882F5F37FD00138852 /* GiantLoggetWatchWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2F5419792F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,6 +30,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 2F12975C2F5DBFF5009FF090;
 			remoteInfo = "GiantLogger Watch App Watch App";
+		};
+		2F5419862F5F37FD00138852 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PRJ000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2F5419782F5F37FC00138852;
+			remoteInfo = GiantLoggetWatchWidgetsExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -53,6 +63,17 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		2F129FA72F5F34AB009FF090 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				2F5419882F5F37FD00138852 /* GiantLoggetWatchWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -60,6 +81,7 @@
 		2F1294D72F5D7B29009FF090 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		2F1294D92F5D7B29009FF090 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		2F12975D2F5DBFF5009FF090 /* GiantLogger Watch App Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "GiantLogger Watch App Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2F5419792F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GiantLoggetWatchWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		APP00000000000000000001 /* GiantLogger.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GiantLogger.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -86,6 +108,13 @@
 			);
 			target = TGT000000000000000000001 /* GiantLogger */;
 		};
+		2F54198C2F5F37FD00138852 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2F5419782F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension */;
+		};
 		EXC000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -98,6 +127,8 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F1296492F5D83D8009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294EF2F5D7B2A009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "dk.hilli.GiantLogger.widget-ios"; sourceTree = "<group>"; };
 		2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "GiantLogger Watch App Watch App"; sourceTree = "<group>"; };
+		2F129F982F5F34AA009FF090 /* GiantLogger Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "GiantLogger Watch App"; sourceTree = "<group>"; };
+		2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F54198C2F5F37FD00138852 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLoggetWatchWidgets; sourceTree = "<group>"; };
 		SRC000000000000000000001 /* GiantLogger */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (EXC000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294F22F5D7BD0009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLogger; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -115,6 +146,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2F5419762F5F37FC00138852 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2F54197B2F5F37FC00138852 /* SwiftUI.framework in Frameworks */,
+				2F54197A2F5F37FC00138852 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -143,6 +183,7 @@
 				APP00000000000000000001 /* GiantLogger.app */,
 				2F1294D52F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-iosExtension.appex */,
 				2F12975D2F5DBFF5009FF090 /* GiantLogger Watch App Watch App.app */,
+				2F5419792F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -153,6 +194,8 @@
 				SRC000000000000000000001 /* GiantLogger */,
 				2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */,
 				2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */,
+				2F129F982F5F34AA009FF090 /* GiantLogger Watch App */,
+				2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */,
 				2F1294D62F5D7B29009FF090 /* Frameworks */,
 				PRD000000000000000000001 /* Products */,
 			);
@@ -190,10 +233,12 @@
 				2F1297592F5DBFF5009FF090 /* Sources */,
 				2F12975A2F5DBFF5009FF090 /* Frameworks */,
 				2F12975B2F5DBFF5009FF090 /* Resources */,
+				2F129FA72F5F34AB009FF090 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				2F5419872F5F37FD00138852 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */,
@@ -204,6 +249,28 @@
 			productName = "GiantLogger Watch App Watch App";
 			productReference = 2F12975D2F5DBFF5009FF090 /* GiantLogger Watch App Watch App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		2F5419782F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2F5419892F5F37FD00138852 /* Build configuration list for PBXNativeTarget "GiantLoggetWatchWidgetsExtension" */;
+			buildPhases = (
+				2F5419752F5F37FC00138852 /* Sources */,
+				2F5419762F5F37FC00138852 /* Frameworks */,
+				2F5419772F5F37FC00138852 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */,
+			);
+			name = GiantLoggetWatchWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = GiantLoggetWatchWidgetsExtension;
+			productReference = 2F5419792F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		TGT000000000000000000001 /* GiantLogger */ = {
 			isa = PBXNativeTarget;
@@ -247,6 +314,9 @@
 					2F12975C2F5DBFF5009FF090 = {
 						CreatedOnToolsVersion = 26.3;
 					};
+					2F5419782F5F37FC00138852 = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					TGT000000000000000000001 = {
 						CreatedOnToolsVersion = 16.2;
 					};
@@ -268,6 +338,7 @@
 				TGT000000000000000000001 /* GiantLogger */,
 				2F1294D42F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-iosExtension */,
 				2F12975C2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */,
+				2F5419782F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -281,6 +352,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		2F12975B2F5DBFF5009FF090 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2F5419772F5F37FC00138852 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -311,6 +389,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		2F5419752F5F37FC00138852 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		SRC000000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -330,6 +415,11 @@
 			isa = PBXTargetDependency;
 			target = 2F12975C2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */;
 			targetProxy = 2F1297652F5DBFF7009FF090 /* PBXContainerItemProxy */;
+		};
+		2F5419872F5F37FD00138852 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2F5419782F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension */;
+			targetProxy = 2F5419862F5F37FD00138852 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -468,6 +558,76 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		2F54198A2F5F37FD00138852 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = "GiantLoggetWatchWidgets/GiantLoggetWatchWidgets.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7NLS34A7F5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GiantLoggetWatchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GiantLoggetWatchWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dk.hilli.GiantLogger.watchkitapp.GiantLoggetWatchWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		2F54198B2F5F37FD00138852 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = "GiantLoggetWatchWidgets/GiantLoggetWatchWidgets.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7NLS34A7F5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GiantLoggetWatchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GiantLoggetWatchWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dk.hilli.GiantLogger.watchkitapp.GiantLoggetWatchWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -698,6 +858,15 @@
 			buildConfigurations = (
 				2F1297692F5DBFF7009FF090 /* Debug */,
 				2F12976A2F5DBFF7009FF090 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2F5419892F5F37FD00138852 /* Build configuration list for PBXNativeTarget "GiantLoggetWatchWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F54198A2F5F37FD00138852 /* Debug */,
+				2F54198B2F5F37FD00138852 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

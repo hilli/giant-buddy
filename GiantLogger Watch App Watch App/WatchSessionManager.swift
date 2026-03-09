@@ -1,6 +1,7 @@
 import SwiftUI
 import WatchConnectivity
 import WatchKit
+import WidgetKit
 import Combine
 
 /// Manages WatchConnectivity on the Watch side, receiving telemetry
@@ -63,7 +64,10 @@ class WatchSessionManager: NSObject, ObservableObject {
     // swiftlint:disable:next cyclomatic_complexity
     private func updateFromContext(_ context: [String: Any]) {
         if let val = context["speed"] as? Double { speed = val }
-        if let val = context["battery"] as? Int { battery = val }
+        if let val = context["battery"] as? Int {
+            battery = val
+            persistForComplications(battery: val, range: context["estimatedRange"] as? Int)
+        }
         if let val = context["distance"] as? Double { distance = val }
         if let val = context["duration"] as? Int { duration = val }
         if let val = context["cadence"] as? Double { cadence = val }
@@ -75,6 +79,16 @@ class WatchSessionManager: NSObject, ObservableObject {
         if let val = context["navDistance"] as? Double { navDistance = val }
         if let val = context["navSymbol"] as? String { navSymbol = val }
         navStreet = context["navStreet"] as? String
+    }
+
+    private func persistForComplications(battery: Int, range: Int?) {
+        let defaults = UserDefaults(suiteName: "group.dk.hilli.GiantLogger")
+        defaults?.set(battery, forKey: "batteryPercent")
+        defaults?.set(Date(), forKey: "lastConnected")
+        if let range, range > 0 {
+            defaults?.set(range, forKey: "estimatedRange")
+        }
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

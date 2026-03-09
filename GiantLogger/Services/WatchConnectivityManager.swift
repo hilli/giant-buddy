@@ -43,7 +43,8 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "cadence": cadence,
             "watts": watts,
             "isRecording": isRecording,
-            "bikeName": bikeName
+            "bikeName": bikeName,
+            "estimatedRange": SharedBikeData.estimatedRange
         ]
 
         try? session.updateApplicationContext(context)
