@@ -40,6 +40,11 @@ struct SharedBikeData {
         set { sharedDefaults?.set(newValue, forKey: "assistMode") }
     }
 
+    static var estimatedRange: Int {
+        get { sharedDefaults?.integer(forKey: "estimatedRange") ?? 0 }
+        set { sharedDefaults?.set(newValue, forKey: "estimatedRange") }
+    }
+
     // Last ride
     static var lastRideDate: Date? {
         get { sharedDefaults?.object(forKey: "lastRideDate") as? Date }

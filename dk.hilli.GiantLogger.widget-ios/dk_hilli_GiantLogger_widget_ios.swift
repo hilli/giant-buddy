@@ -5,7 +5,7 @@ import SwiftUI
 
 struct BatteryProvider: TimelineProvider {
     func placeholder(in context: Context) -> BatteryEntry {
-        BatteryEntry(date: Date(), batteryPercent: 75, batteryHealth: 95, bikeName: "Giant E-Bike", lastConnected: Date(), assistMode: "Normal")
+        BatteryEntry(date: Date(), batteryPercent: 75, batteryHealth: 95, bikeName: "Giant E-Bike", lastConnected: Date(), estimatedRange: 62, totalOdometer: 1234)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (BatteryEntry) -> Void) {
@@ -15,7 +15,8 @@ struct BatteryProvider: TimelineProvider {
             batteryHealth: SharedBikeData.batteryHealth,
             bikeName: SharedBikeData.bikeName,
             lastConnected: SharedBikeData.lastConnected,
-            assistMode: SharedBikeData.assistMode
+            estimatedRange: SharedBikeData.estimatedRange,
+            totalOdometer: SharedBikeData.totalOdometer
         )
         completion(entry)
     }
@@ -27,7 +28,8 @@ struct BatteryProvider: TimelineProvider {
             batteryHealth: SharedBikeData.batteryHealth,
             bikeName: SharedBikeData.bikeName,
             lastConnected: SharedBikeData.lastConnected,
-            assistMode: SharedBikeData.assistMode
+            estimatedRange: SharedBikeData.estimatedRange,
+            totalOdometer: SharedBikeData.totalOdometer
         )
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
@@ -41,7 +43,8 @@ struct BatteryEntry: TimelineEntry {
     let batteryHealth: Int
     let bikeName: String
     let lastConnected: Date?
-    let assistMode: String
+    let estimatedRange: Int
+    let totalOdometer: Double
 }
 
 struct BatteryWidgetView: View {
@@ -77,7 +80,7 @@ struct BatteryWidgetView: View {
                 .foregroundStyle(batteryColor)
 
             if let lastConnected = entry.lastConnected {
-                Text(lastConnected, style: .relative)
+                Text("\(lastConnected, style: .relative) ago")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -115,16 +118,23 @@ struct BatteryWidgetView: View {
                     Label("\(entry.batteryHealth)%", systemImage: "heart.fill")
                         .font(.caption)
                         .foregroundStyle(.pink)
-                    Label(entry.assistMode, systemImage: "bolt.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                    if entry.estimatedRange > 0 {
+                        Label("\(entry.estimatedRange) km", systemImage: "bolt.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    if entry.totalOdometer > 0 {
+                        Label(String(format: "%.0f km", entry.totalOdometer), systemImage: "road.lanes")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                    }
                 }
 
                 if let lastConnected = entry.lastConnected {
                     HStack {
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.caption2)
-                        Text(lastConnected, style: .relative)
+                        Text("\(lastConnected, style: .relative) ago")
                             .font(.caption2)
                     }
                     .foregroundStyle(.secondary)

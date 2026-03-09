@@ -364,6 +364,9 @@ class GiantBikeService: ObservableObject {
         }
         rideData.rangeData = rangeData
         UserDefaults.standard.set(rangeData.eco, forKey: "lastRangeKm")
+        // Share best available range with widgets
+        let bestRange = rangeData.nonZeroModes.first?.range ?? rangeData.eco
+        SharedBikeData.estimatedRange = bestRange
         let all = "eco=\(rangeData.eco) norm=\(rangeData.normal) pwr=\(rangeData.power) boost=\(rangeData.boost) smart=\(rangeData.smart)"
         logger.debug("Range: \(all, privacy: .public)")
         debugLog.log("GEV", "Range: \(all)")
