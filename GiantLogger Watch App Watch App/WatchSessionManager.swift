@@ -1,7 +1,6 @@
 import SwiftUI
 import WatchConnectivity
 import WatchKit
-import HealthKit
 import Combine
 
 /// Manages WatchConnectivity on the Watch side, receiving telemetry
@@ -33,9 +32,6 @@ class WatchSessionManager: NSObject, ObservableObject {
     @Published var isPhoneReachable: Bool = false
 
     private var session: WCSession?
-    private let healthStore = HKHealthStore()
-    private var workoutSession: HKWorkoutSession?
-    private var workoutBuilder: HKLiveWorkoutBuilder?
 
     override init() {
         super.init()
@@ -43,56 +39,6 @@ class WatchSessionManager: NSObject, ObservableObject {
             session = WCSession.default
             session?.delegate = self
             session?.activate()
-        }
-    }
-
-    // MARK: - HealthKit Workout
-
-    func startWorkout() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-        let config = HKWorkoutConfiguration()
-        config.activityType = .cycling
-        config.locationType = .outdoor
-
-        do {
-            workoutSession = try HKWorkoutSession(healthStore: healthStore, configuration: config)
-            workoutBuilder = workoutSession?.associatedWorkoutBuilder()
-            workoutBuilder?.dataSource = HKLiveWorkoutDataSource(healthStore: healthStore, workoutConfiguration: config)
-            workoutBuilder?.delegate = self
-            workoutSession?.delegate = self
-
-            workoutSession?.startActivity(with: .now)
-            Task {
-                try await workoutBuilder?.beginCollection(at: .now)
-            }
-        } catch {
-            print("WatchSession: Failed to start workout: \(error)")
-        }
-    }
-
-    func stopWorkout() {
-        workoutSession?.end()
-        Task {
-            try await workoutBuilder?.endCollection(at: .now)
-            try await workoutBuilder?.finishWorkout()
-        }
-        workoutSession = nil
-        workoutBuilder = nil
-        heartRate = 0
-        activeCalories = 0
-    }
-
-    func requestHealthKitPermissions() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-        let readTypes: Set<HKSampleType> = [
-            HKQuantityType(.heartRate),
-            HKQuantityType(.activeEnergyBurned)
-        ]
-        let shareTypes: Set<HKSampleType> = [
-            HKQuantityType.workoutType()
-        ]
-        healthStore.requestAuthorization(toShare: shareTypes, read: readTypes) { success, error in
-            if let error { print("HealthKit auth failed: \(error)") }
         }
     }
 
@@ -122,15 +68,7 @@ class WatchSessionManager: NSObject, ObservableObject {
         if let val = context["duration"] as? Int { duration = val }
         if let val = context["cadence"] as? Double { cadence = val }
         if let val = context["watts"] as? Double { watts = val }
-        if let val = context["isRecording"] as? Bool {
-            let wasRecording = isRecording
-            isRecording = val
-            if val && !wasRecording {
-                startWorkout()
-            } else if !val && wasRecording {
-                stopWorkout()
-            }
-        }
+        if let val = context["isRecording"] as? Bool { isRecording = val }
         if let val = context["bikeName"] as? String { bikeName = val }
         if let val = context["isNavigating"] as? Bool { isNavigating = val }
         if let val = context["navInstruction"] as? String { navInstruction = val }
@@ -173,63 +111,5 @@ extension WatchSessionManager: WCSessionDelegate {
         Task { @MainActor in
             isPhoneReachable = session.isReachable
         }
-    }
-}
-
-// MARK: - HKWorkoutSessionDelegate
-
-extension WatchSessionManager: HKWorkoutSessionDelegate {
-    nonisolated func workoutSession(
-        _ workoutSession: HKWorkoutSession,
-        didChangeTo toState: HKWorkoutSessionState,
-        from fromState: HKWorkoutSessionState,
-        date: Date
-    ) {
-        // No-op for now
-    }
-
-    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
-        print("Workout session failed: \(error)")
-    }
-}
-
-// MARK: - HKLiveWorkoutBuilderDelegate
-
-extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
-    nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
-
-    nonisolated func workoutBuilder(
-        _ workoutBuilder: HKLiveWorkoutBuilder,
-        didCollectDataOf collectedTypes: Set<HKSampleType>
-    ) {
-        for type in collectedTypes {
-            guard let quantityType = type as? HKQuantityType else { continue }
-
-            if let stats = workoutBuilder.statistics(for: quantityType) {
-                Task { @MainActor in
-                    switch quantityType {
-                    case HKQuantityType(.heartRate):
-                        let hr = stats.mostRecentQuantity()?
-                            .doubleValue(for: HKUnit.count().unitDivided(by: .minute())) ?? 0
-                        heartRate = hr
-                        sendHeartRate(hr, calories: activeCalories)
-                    case HKQuantityType(.activeEnergyBurned):
-                        activeCalories = stats.sumQuantity()?
-                            .doubleValue(for: .kilocalorie()) ?? 0
-                        sendHeartRate(heartRate, calories: activeCalories)
-                    default: break
-                    }
-                }
-            }
-        }
-    }
-
-    private func sendHeartRate(_ hr: Double, calories: Double) {
-        guard let session, session.isReachable else { return }
-        session.sendMessage([
-            "type": "heartRate",
-            "heartRate": hr,
-            "activeCalories": calories
-        ], replyHandler: nil)
     }
 }
