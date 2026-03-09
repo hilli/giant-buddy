@@ -174,6 +174,7 @@ struct LastRideWidget: Widget {
         StaticConfiguration(kind: kind, provider: LastRideProvider()) { entry in
             LastRideWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
+                .widgetURL(URL(string: "giantlogger://lastride"))
         }
         .configurationDisplayName("Last Ride")
         .description("Shows a summary of your most recent e-bike ride.")

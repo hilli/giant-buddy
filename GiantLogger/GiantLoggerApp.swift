@@ -52,7 +52,10 @@ struct GiantLoggerApp: App {
                     }
                 }
                 .onOpenURL { url in
-                    if url.scheme == "giantlogger" {
+                    guard url.scheme == "giantlogger" else { return }
+                    if url.host == "lastride" {
+                        NotificationCenter.default.post(name: .switchToHistoryTab, object: nil)
+                    } else {
                         Task {
                             await stravaService.handleCallback(url)
                         }
