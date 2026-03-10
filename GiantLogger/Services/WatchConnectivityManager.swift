@@ -101,9 +101,14 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 }
 
 extension WatchConnectivityManager: WCSessionDelegate {
-    nonisolated func session(_: WCSession, activationDidCompleteWith _: WCSessionActivationState, error: Error?) {
+    nonisolated func session(_: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {
         if let error {
             print("WatchConnectivity: activation failed: \(error)")
+        }
+        if state == .activated {
+            Task { @MainActor in
+                self.pushBikeDataForComplications()
+            }
         }
     }
 

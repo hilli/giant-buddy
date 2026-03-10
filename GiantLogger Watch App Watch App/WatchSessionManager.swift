@@ -109,6 +109,11 @@ extension WatchSessionManager: WCSessionDelegate {
         }
         Task { @MainActor in
             isPhoneReachable = session.isReachable
+            // Load last received context so Watch has data immediately
+            let context = session.receivedApplicationContext
+            if !context.isEmpty {
+                updateFromContext(context)
+            }
         }
     }
 
