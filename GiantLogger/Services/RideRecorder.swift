@@ -30,6 +30,7 @@ class RideRecorder: ObservableObject {
     private var locationManager: LocationManager?
     private var workoutManager: WorkoutManager?
     private var stravaService: StravaService?
+    private var navigationEngine: NavigationEngine?
     private var modelContext: ModelContext?
     private var recordingTask: Task<Void, Never>?
     private var durationTask: Task<Void, Never>?
@@ -43,15 +44,17 @@ class RideRecorder: ObservableObject {
 
     init() {
         UserDefaults.standard.register(defaults: ["autoRecord": true])
+        liveActivityManager.cleanupStaleActivities()
     }
 
     func configure(bikeService: GiantBikeService, locationManager: LocationManager,
                    workoutManager: WorkoutManager, stravaService: StravaService,
-                   modelContext: ModelContext) {
+                   navigationEngine: NavigationEngine, modelContext: ModelContext) {
         self.bikeService = bikeService
         self.locationManager = locationManager
         self.workoutManager = workoutManager
         self.stravaService = stravaService
+        self.navigationEngine = navigationEngine
         self.modelContext = modelContext
 
         // Auto-start recording when GEV connects; always stop on disconnect
@@ -231,6 +234,11 @@ class RideRecorder: ObservableObject {
         // Feed GPS location to workout route builder
         if logWorkouts, let location {
             workoutManager?.addRouteLocation(location)
+        }
+
+        // Update turn-by-turn navigation with current position
+        if let location, navigationEngine?.activeRoute != nil {
+            navigationEngine?.updateLocation(location)
         }
 
         // Update running average speed (O(1) instead of O(n))

@@ -81,7 +81,7 @@ class LiveActivityManager: ObservableObject {
         Task {
             await activity.end(
                 .init(state: finalState, staleDate: nil),
-                dismissalPolicy: .default
+                dismissalPolicy: .immediate
             )
             logger.info("Ended Live Activity: \(activity.id)")
         }

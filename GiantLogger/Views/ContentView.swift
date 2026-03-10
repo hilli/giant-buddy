@@ -92,6 +92,7 @@ struct ContentView: View {
                     locationManager: locationManager,
                     workoutManager: workoutManager,
                     stravaService: stravaService,
+                    navigationEngine: navigationEngine,
                     modelContext: modelContext
                 )
                 if UserDefaults.standard.bool(forKey: "logWorkouts") {
