@@ -174,6 +174,7 @@ class GiantBikeService: ObservableObject {
                 SharedBikeData.totalOdometer = Double(info.odo)
                 SharedBikeData.lastConnected = Date()
                 WidgetCenter.shared.reloadAllTimelines()
+                WatchConnectivityManager.shared.pushBikeDataForComplications()
             }
             isFetchingBikeInfo = false
             debugLog.log("GEV", "Bike data fetch complete")
@@ -367,6 +368,7 @@ class GiantBikeService: ObservableObject {
         // Share best available range with widgets
         let bestRange = rangeData.nonZeroModes.first?.range ?? rangeData.eco
         SharedBikeData.estimatedRange = bestRange
+        WatchConnectivityManager.shared.pushBikeDataForComplications()
         let all = "eco=\(rangeData.eco) norm=\(rangeData.normal) pwr=\(rangeData.power) boost=\(rangeData.boost) smart=\(rangeData.smart)"
         logger.debug("Range: \(all, privacy: .public)")
         debugLog.log("GEV", "Range: \(all)")
@@ -407,6 +409,7 @@ class GiantBikeService: ObservableObject {
         SharedBikeData.batteryHealth = batteryData.lifePercent
         SharedBikeData.lastConnected = Date()
         WidgetCenter.shared.reloadAllTimelines()
+        WatchConnectivityManager.shared.pushBikeDataForComplications()
     }
 
     private func handleDiagnosticSyncDrive(_ plaintext: [UInt8]) {

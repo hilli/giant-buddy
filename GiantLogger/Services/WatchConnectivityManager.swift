@@ -57,6 +57,20 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         try? session.updateApplicationContext(context)
     }
 
+    /// Push current battery/range to Watch for complications (call when bike data arrives).
+    func pushBikeDataForComplications() {
+        guard let session, session.isPaired, session.isWatchAppInstalled else { return }
+
+        // Merge into existing context so we don't overwrite other fields
+        var context = session.applicationContext
+        context["battery"] = SharedBikeData.batteryPercent
+        context["estimatedRange"] = SharedBikeData.estimatedRange
+        context["bikeName"] = SharedBikeData.bikeName
+        context["isRecording"] = context["isRecording"] ?? false
+
+        try? session.updateApplicationContext(context)
+    }
+
     /// Send navigation instruction update (triggers haptic on Watch).
     func sendNavigationUpdate(instruction: String, distance: Double, symbol: String,
                               street: String?, isNavigating: Bool) {
