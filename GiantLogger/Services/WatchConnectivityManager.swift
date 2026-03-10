@@ -47,6 +47,8 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "isRecording": isRecording,
             "bikeName": bikeName,
             "estimatedRange": SharedBikeData.estimatedRange,
+            "totalOdometer": SharedBikeData.totalOdometer,
+            "totalUsageHours": SharedBikeData.totalUsageHours,
             "isNavigating": isNavigating,
             "navInstruction": navInstruction,
             "navDistance": navDistance,
@@ -67,6 +69,8 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         context["estimatedRange"] = SharedBikeData.estimatedRange
         context["bikeName"] = SharedBikeData.bikeName
         context["isRecording"] = context["isRecording"] ?? false
+        context["totalOdometer"] = SharedBikeData.totalOdometer
+        context["totalUsageHours"] = SharedBikeData.totalUsageHours
 
         try? session.updateApplicationContext(context)
     }

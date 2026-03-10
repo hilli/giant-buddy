@@ -127,7 +127,7 @@ struct ConnectionView: View {
 
     private func batterySection(_ info: BikeInfo) -> some View {
         Section {
-            InfoRow(label: "Charge", value: "\(info.epCapacityPercent)%")
+            InfoRow(label: "Charge", value: "\(bikeService.rideData.batteryPercent > 0 ? bikeService.rideData.batteryPercent : info.epCapacityPercent)%")
             InfoRow(label: "Health", value: "\(info.epLifePercent)%")
             InfoRow(label: "Last Full Capacity", value: String(format: "%.1f Wh", info.epLastFullCapacityWh))
             if info.epCapacityWh > 0 {

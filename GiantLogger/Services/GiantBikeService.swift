@@ -172,6 +172,7 @@ class GiantBikeService: ObservableObject {
                 SharedBikeData.batteryPercent = info.epCapacityPercent
                 SharedBikeData.batteryHealth = info.epLifePercent
                 SharedBikeData.totalOdometer = Double(info.odo)
+                SharedBikeData.totalUsageHours = info.totalUsageHours
                 SharedBikeData.lastConnected = Date()
                 WidgetCenter.shared.reloadAllTimelines()
                 WatchConnectivityManager.shared.pushBikeDataForComplications()

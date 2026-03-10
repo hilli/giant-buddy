@@ -9,6 +9,7 @@ struct DashboardView: View {
                 metricsTab
                 navigationTab
                 controlTab
+                bikeInfoTab
             }
             .tabViewStyle(.verticalPage)
         }
@@ -155,6 +156,53 @@ struct DashboardView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Bike Info Tab
+
+    private var bikeInfoTab: some View {
+        VStack(spacing: 6) {
+            Text(session.bikeName)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Divider().padding(.horizontal, 20)
+
+            bikeInfoRow(icon: "battery.100", label: "Battery", value: "\(session.battery)%", color: batteryColor)
+            bikeInfoRow(icon: "bolt.fill", label: "Range", value: "\(session.estimatedRange) km", color: .orange)
+            bikeInfoRow(icon: "road.lanes", label: "Odometer", value: String(format: "%.0f km", session.totalOdometer), color: .blue)
+            bikeInfoRow(icon: "clock", label: "Usage", value: "\(session.totalUsageHours) hrs", color: .purple)
+
+            Spacer()
+
+            if session.isPhoneReachable {
+                Label("Connected", systemImage: "iphone")
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+            } else {
+                Label("Disconnected", systemImage: "iphone.slash")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func bikeInfoRow(icon: String, label: String, value: String, color: Color) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(color)
+                .frame(width: 20)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(.caption, design: .rounded).bold())
+        }
+        .padding(.horizontal, 8)
     }
 
     // MARK: - Helpers

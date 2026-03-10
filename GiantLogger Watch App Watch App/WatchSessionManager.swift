@@ -17,6 +17,9 @@ class WatchSessionManager: NSObject, ObservableObject {
     @Published var watts: Double = 0
     @Published var isRecording: Bool = false
     @Published var bikeName: String = "Giant E-Bike"
+    @Published var estimatedRange: Int = 0
+    @Published var totalOdometer: Double = 0
+    @Published var totalUsageHours: Int = 0
 
     // Heart rate / workout
     @Published var heartRate: Double = 0
@@ -74,6 +77,9 @@ class WatchSessionManager: NSObject, ObservableObject {
         if let val = context["watts"] as? Double { watts = val }
         if let val = context["isRecording"] as? Bool { isRecording = val }
         if let val = context["bikeName"] as? String { bikeName = val }
+        if let val = context["estimatedRange"] as? Int { estimatedRange = val }
+        if let val = context["totalOdometer"] as? Double { totalOdometer = val }
+        if let val = context["totalUsageHours"] as? Int { totalUsageHours = val }
         if let val = context["isNavigating"] as? Bool { isNavigating = val }
         if let val = context["navInstruction"] as? String { navInstruction = val }
         if let val = context["navDistance"] as? Double { navDistance = val }
