@@ -61,7 +61,10 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     /// Push current battery/range to Watch for complications (call when bike data arrives).
     func pushBikeDataForComplications() {
-        guard let session, session.isPaired, session.isWatchAppInstalled else { return }
+        guard let session, session.isPaired, session.isWatchAppInstalled else {
+            print("WatchConnectivity: pushBikeData skipped - paired=\(session?.isPaired ?? false) installed=\(session?.isWatchAppInstalled ?? false)")
+            return
+        }
 
         // Merge into existing context so we don't overwrite other fields
         var context = session.applicationContext
@@ -71,8 +74,14 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         context["isRecording"] = context["isRecording"] ?? false
         context["totalOdometer"] = SharedBikeData.totalOdometer
         context["totalUsageHours"] = SharedBikeData.totalUsageHours
+        context["lastPush"] = Date().timeIntervalSince1970
 
-        try? session.updateApplicationContext(context)
+        do {
+            try session.updateApplicationContext(context)
+            print("WatchConnectivity: pushed bike data - battery=\(SharedBikeData.batteryPercent)% range=\(SharedBikeData.estimatedRange)km odo=\(SharedBikeData.totalOdometer)")
+        } catch {
+            print("WatchConnectivity: pushBikeData FAILED: \(error)")
+        }
     }
 
     /// Send navigation instruction update (triggers haptic on Watch).

@@ -101,16 +101,18 @@ class WatchSessionManager: NSObject, ObservableObject {
 extension WatchSessionManager: WCSessionDelegate {
     nonisolated func session(
         _ session: WCSession,
-        activationDidCompleteWith _: WCSessionActivationState,
+        activationDidCompleteWith state: WCSessionActivationState,
         error: Error?
     ) {
         if let error {
             print("WatchSession: activation failed: \(error)")
         }
+        print("WatchSession: activated state=\(state.rawValue) reachable=\(session.isReachable)")
         Task { @MainActor in
             isPhoneReachable = session.isReachable
             // Load last received context so Watch has data immediately
             let context = session.receivedApplicationContext
+            print("WatchSession: cached context has \(context.count) keys: \(Array(context.keys))")
             if !context.isEmpty {
                 updateFromContext(context)
             }
@@ -118,6 +120,7 @@ extension WatchSessionManager: WCSessionDelegate {
     }
 
     nonisolated func session(_: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        print("WatchSession: received context with \(applicationContext.count) keys - battery=\(applicationContext["battery"] ?? "nil")")
         Task { @MainActor in
             updateFromContext(applicationContext)
         }
