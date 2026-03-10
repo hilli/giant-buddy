@@ -140,11 +140,15 @@ class RideRecorder: ObservableObject {
             } else {
                 // Save workout to HealthKit if enabled
                 if logWorkouts {
+                    let hrSamples = (ride.samples ?? [])
+                        .filter { $0.heartRate > 0 }
+                        .map { (timestamp: $0.timestamp, bpm: $0.heartRate) }
                     workoutManager?.stopWorkout(
                         distance: ride.totalDistance,
                         elevationGain: ride.elevationGain,
                         avgPower: ride.avgPower,
-                        duration: TimeInterval(ride.duration)
+                        duration: TimeInterval(ride.duration),
+                        heartRateSamples: hrSamples
                     )
                 }
 

@@ -28,6 +28,9 @@ class WorkoutManager: ObservableObject {
         if let energy = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
             types.insert(energy)
         }
+        if let hr = HKQuantityType.quantityType(forIdentifier: .heartRate) {
+            types.insert(hr)
+        }
         return types
     }
 
@@ -94,7 +97,8 @@ class WorkoutManager: ObservableObject {
 
     /// Stop the workout and save it with ride summary data.
     /// Chains: add samples → endCollection → finishWorkout → finishRoute.
-    func stopWorkout(distance: Double, elevationGain: Double, avgPower: Double, duration: TimeInterval) {
+    func stopWorkout(distance: Double, elevationGain: Double, avgPower: Double, duration: TimeInterval,
+                     heartRateSamples: [(timestamp: Date, bpm: Double)] = []) {
         guard let builder = workoutBuilder else {
             debugLog.log("HK", "stopWorkout called but no active builder")
             return
@@ -130,6 +134,22 @@ class WorkoutManager: ObservableObject {
                 start: startDate, end: endDate
             )
             samples.append(sample)
+        }
+
+        // Add individual heart rate samples
+        if let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) {
+            let bpmUnit = HKUnit.count().unitDivided(by: .minute())
+            for hr in heartRateSamples where hr.bpm > 0 {
+                let sample = HKQuantitySample(
+                    type: hrType,
+                    quantity: HKQuantity(unit: bpmUnit, doubleValue: hr.bpm),
+                    start: hr.timestamp, end: hr.timestamp.addingTimeInterval(2)
+                )
+                samples.append(sample)
+            }
+            if !heartRateSamples.isEmpty {
+                debugLog.log("HK", "Including \(heartRateSamples.filter { $0.bpm > 0 }.count) HR samples")
+            }
         }
 
         // Step 1: Add all samples at once
