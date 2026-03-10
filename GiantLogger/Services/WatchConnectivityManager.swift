@@ -31,11 +31,13 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     /// Send latest telemetry to Watch as application context.
     func sendTelemetry( // swiftlint:disable:this function_parameter_count
         speed: Double, battery: Int, distance: Double, duration: Int,
-        cadence: Double, watts: Double, isRecording: Bool, bikeName: String
+        cadence: Double, watts: Double, isRecording: Bool, bikeName: String,
+        isNavigating: Bool = false, navInstruction: String = "",
+        navDistance: Double = 0, navSymbol: String = "arrow.up", navStreet: String? = nil
     ) {
         guard let session, session.isPaired, session.isWatchAppInstalled else { return }
 
-        let context: [String: Any] = [
+        var context: [String: Any] = [
             "speed": speed,
             "battery": battery,
             "distance": distance,
@@ -44,8 +46,13 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "watts": watts,
             "isRecording": isRecording,
             "bikeName": bikeName,
-            "estimatedRange": SharedBikeData.estimatedRange
+            "estimatedRange": SharedBikeData.estimatedRange,
+            "isNavigating": isNavigating,
+            "navInstruction": navInstruction,
+            "navDistance": navDistance,
+            "navSymbol": navSymbol
         ]
+        if let navStreet { context["navStreet"] = navStreet }
 
         try? session.updateApplicationContext(context)
     }

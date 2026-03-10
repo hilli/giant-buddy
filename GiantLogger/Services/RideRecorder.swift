@@ -256,7 +256,9 @@ class RideRecorder: ObservableObject {
             power: bikeService.rideData.watts
         )
 
-        // Send telemetry to Apple Watch
+        // Send telemetry to Apple Watch (including navigation state)
+        let isNav = navigationEngine?.activeRoute != nil
+        let navInstr = navigationEngine?.currentInstruction
         watchConnectivity.sendTelemetry(
             speed: bikeService.rideData.speed,
             battery: bikeService.rideData.batteryPercent,
@@ -265,7 +267,12 @@ class RideRecorder: ObservableObject {
             cadence: bikeService.rideData.cadence,
             watts: bikeService.rideData.watts,
             isRecording: true,
-            bikeName: SharedBikeData.bikeName
+            bikeName: SharedBikeData.bikeName,
+            isNavigating: isNav,
+            navInstruction: navInstr?.maneuverType.rawValue ?? "",
+            navDistance: navigationEngine?.distanceToNextManeuver ?? 0,
+            navSymbol: navInstr?.maneuverType.sfSymbol ?? "arrow.up",
+            navStreet: navInstr?.streetName
         )
     }
 
