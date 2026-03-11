@@ -84,12 +84,11 @@ struct DestinationSearchView: View {
 
     private var categoryBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                // Favorites tab
-                categoryPill(
+            HStack(spacing: 8) {
+                categoryChip(
                     label: "Favorites",
                     icon: "star.fill",
-                    color: .yellow,
+                    color: .orange,
                     isSelected: showingFavorites
                 ) {
                     showingFavorites = true
@@ -98,7 +97,7 @@ struct DestinationSearchView: View {
                 }
 
                 ForEach(POISearchService.POICategory.allCases) { category in
-                    categoryPill(
+                    categoryChip(
                         label: category.rawValue,
                         icon: category.icon,
                         color: category.color,
@@ -113,26 +112,19 @@ struct DestinationSearchView: View {
                     }
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 4)
         }
     }
 
-    private func categoryPill(label: String, icon: String, color: Color, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func categoryChip(label: String, icon: String, color: Color, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption)
-                Text(label)
-                    .font(.caption)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(isSelected ? color.opacity(0.2) : Color(.systemGray6))
-            .foregroundStyle(isSelected ? color : .primary)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(isSelected ? color : .clear, lineWidth: 1))
+            Label(label, systemImage: icon)
+                .font(.subheadline)
+                .lineLimit(1)
         }
+        .buttonStyle(.bordered)
+        .tint(isSelected ? color : .secondary)
+        .buttonBorderShape(.capsule)
     }
 
     // MARK: - Search Results
