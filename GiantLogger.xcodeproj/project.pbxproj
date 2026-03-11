@@ -506,6 +506,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Needed to read your relevant health data";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy records your heart rate during rides.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dk.hilli.GiantLogger;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -543,6 +544,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Needed to read your relevant health data";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy records your heart rate during rides.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dk.hilli.GiantLogger;
 				LD_RUNPATH_SEARCH_PATHS = (
