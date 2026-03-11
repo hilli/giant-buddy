@@ -238,7 +238,14 @@ extension BikeManager: CBCentralManagerDelegate {
                 logger.info("Disconnected from peripheral")
                 debugLog.log("BLE", "Disconnected from peripheral")
             }
+            let wasUnexpected = error != nil
             cleanup()
+            // Auto-reconnect on unexpected disconnection
+            if wasUnexpected, autoConnectIdentifier != nil {
+                debugLog.log("BLE", "Unexpected disconnect — will retry in 2s")
+                try? await Task.sleep(for: .seconds(2))
+                attemptAutoReconnect()
+            }
         }
     }
 

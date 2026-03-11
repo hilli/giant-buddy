@@ -9,9 +9,16 @@ struct RideDetailView: View {
     @State private var exportURL: IdentifiableURL?
     @State private var stravaUploadSuccess = false
     @State private var savedAsRoute = false
+    @State private var selectedTimestamp: Date?
 
     private var sortedSamples: [RideSample] {
         (ride.samples ?? []).sorted { $0.timestamp < $1.timestamp }
+    }
+
+    /// The sample closest to the scrubber position.
+    private var selectedSample: RideSample? {
+        guard let ts = selectedTimestamp else { return nil }
+        return sortedSamples.min(by: { abs($0.timestamp.timeIntervalSince(ts)) < abs($1.timestamp.timeIntervalSince(ts)) })
     }
 
     private var gpsCoordinates: [CLLocationCoordinate2D] {
@@ -150,8 +157,16 @@ struct RideDetailView: View {
 
     private var speedChart: some View {
         VStack(alignment: .leading) {
-            Text("Speed")
-                .font(.headline)
+            HStack {
+                Text("Speed")
+                    .font(.headline)
+                Spacer()
+                if let s = selectedSample {
+                    Text(String(format: "%.1f km/h @ %.1f km", s.speed, s.distance))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Chart(sortedSamples) { sample in
                 LineMark(
                     x: .value("Time", sample.timestamp),
@@ -159,7 +174,14 @@ struct RideDetailView: View {
                 )
                 .foregroundStyle(.blue)
                 .interpolationMethod(.catmullRom)
+
+                if let ts = selectedTimestamp {
+                    RuleMark(x: .value("Selected", ts))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
+                }
             }
+            .chartXSelection(value: $selectedTimestamp)
             .frame(height: 150)
             .chartYAxisLabel("km/h")
         }
@@ -169,8 +191,16 @@ struct RideDetailView: View {
 
     private var powerChart: some View {
         VStack(alignment: .leading) {
-            Text("Power")
-                .font(.headline)
+            HStack {
+                Text("Power")
+                    .font(.headline)
+                Spacer()
+                if let s = selectedSample {
+                    Text(String(format: "%.0f W @ %.1f km", s.watts, s.distance))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Chart(sortedSamples) { sample in
                 AreaMark(
                     x: .value("Time", sample.timestamp),
@@ -184,7 +214,14 @@ struct RideDetailView: View {
                 )
                 .foregroundStyle(.orange)
                 .interpolationMethod(.catmullRom)
+
+                if let ts = selectedTimestamp {
+                    RuleMark(x: .value("Selected", ts))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
+                }
             }
+            .chartXSelection(value: $selectedTimestamp)
             .frame(height: 150)
             .chartYAxisLabel("Watts")
         }
@@ -194,8 +231,16 @@ struct RideDetailView: View {
 
     private var elevationChart: some View {
         VStack(alignment: .leading) {
-            Text("Elevation")
-                .font(.headline)
+            HStack {
+                Text("Elevation")
+                    .font(.headline)
+                Spacer()
+                if let s = selectedSample, s.altitude != 0 {
+                    Text(String(format: "%.0f m @ %.1f km", s.altitude, s.distance))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Chart(sortedSamples.filter { $0.altitude != 0 }) { sample in
                 AreaMark(
                     x: .value("Time", sample.timestamp),
@@ -209,7 +254,14 @@ struct RideDetailView: View {
                 )
                 .foregroundStyle(.brown)
                 .interpolationMethod(.catmullRom)
+
+                if let ts = selectedTimestamp {
+                    RuleMark(x: .value("Selected", ts))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
+                }
             }
+            .chartXSelection(value: $selectedTimestamp)
             .frame(height: 150)
             .chartYAxisLabel("m")
         }
@@ -219,8 +271,16 @@ struct RideDetailView: View {
 
     private var batteryChart: some View {
         VStack(alignment: .leading) {
-            Text("Battery")
-                .font(.headline)
+            HStack {
+                Text("Battery")
+                    .font(.headline)
+                Spacer()
+                if let s = selectedSample {
+                    Text(String(format: "%.0f%% @ %.1f km", s.batteryPercent, s.distance))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Chart(sortedSamples) { sample in
                 LineMark(
                     x: .value("Time", sample.timestamp),
@@ -228,7 +288,14 @@ struct RideDetailView: View {
                 )
                 .foregroundStyle(.green)
                 .interpolationMethod(.monotone)
+
+                if let ts = selectedTimestamp {
+                    RuleMark(x: .value("Selected", ts))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
+                }
             }
+            .chartXSelection(value: $selectedTimestamp)
             .frame(height: 120)
             .chartYScale(domain: 0...100)
             .chartYAxisLabel("%")
