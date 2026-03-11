@@ -5,13 +5,13 @@ import MapKit
 struct SearchView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var navigationEngine: NavigationEngine
+    @EnvironmentObject var favoritePlacesManager: FavoritePlacesManager
     @StateObject private var searchService = POISearchService()
 
     @State private var searchText = ""
     @State private var selectedResult: POISearchService.POIResult?
     @State private var showingMap = false
     @State private var activeCategory: POISearchService.POICategory?
-    @State private var favorites: [FavoritePlace] = []
     @State private var renamingFavorite: FavoritePlace?
     @State private var renameText = ""
     @State private var searchTask: Task<Void, Never>?
@@ -43,17 +43,15 @@ struct SearchView: View {
                 .environmentObject(locationManager)
                 .environmentObject(navigationEngine)
             }
-            .onAppear { favorites = FavoritePlace.loadAll() }
+            .onAppear { }
             .alert("Rename Favorite", isPresented: Binding(
                 get: { renamingFavorite != nil },
                 set: { if !$0 { renamingFavorite = nil } }
             )) {
                 TextField("Name", text: $renameText)
                 Button("Save") {
-                    if let fav = renamingFavorite,
-                       let idx = favorites.firstIndex(where: { $0.id == fav.id }) {
-                        favorites[idx].name = renameText.trimmingCharacters(in: .whitespaces)
-                        FavoritePlace.saveAll(favorites)
+                    if let fav = renamingFavorite {
+                        favoritePlacesManager.rename(fav, to: renameText.trimmingCharacters(in: .whitespaces))
                     }
                     renamingFavorite = nil
                 }
@@ -70,9 +68,9 @@ struct SearchView: View {
         VStack(spacing: 0) {
             searchBar
 
-            if searchText.isEmpty && !favorites.isEmpty {
+            if searchText.isEmpty && !favoritePlacesManager.favorites.isEmpty {
                 FavoritesSectionView(
-                    favorites: favorites,
+                    favorites: favoritePlacesManager.favorites,
                     currentLocation: locationManager.currentLocation,
                     onSelect: { fav in selectFavorite(fav) },
                     onRename: { fav in
@@ -190,7 +188,7 @@ struct SearchView: View {
             }
             .buttonStyle(.plain)
             .contextMenu {
-                if !favorites.contains(where: {
+                if !favoritePlacesManager.favorites.contains(where: {
                     $0.latitude == result.coordinate.latitude
                         && $0.longitude == result.coordinate.longitude
                 }) {
@@ -201,11 +199,11 @@ struct SearchView: View {
                     }
                 } else {
                     Button {
-                        if let idx = favorites.firstIndex(where: {
+                        if let fav = favoritePlacesManager.favorites.first(where: {
                             $0.latitude == result.coordinate.latitude
                                 && $0.longitude == result.coordinate.longitude
                         }) {
-                            removeFavorite(favorites[idx])
+                            removeFavorite(fav)
                         }
                     } label: {
                         Label("Remove from Favorites", systemImage: "star.slash")
@@ -261,20 +259,11 @@ struct SearchView: View {
     }
 
     private func addToFavorites(_ result: POISearchService.POIResult) {
-        let fav = FavoritePlace(
-            name: result.name,
-            originalName: result.name,
-            address: result.address,
-            latitude: result.coordinate.latitude,
-            longitude: result.coordinate.longitude
-        )
-        favorites.append(fav)
-        FavoritePlace.saveAll(favorites)
+        favoritePlacesManager.add(name: result.name, coordinate: result.coordinate, address: result.address)
     }
 
     private func removeFavorite(_ fav: FavoritePlace) {
-        favorites.removeAll { $0.id == fav.id }
-        FavoritePlace.saveAll(favorites)
+        favoritePlacesManager.delete(fav)
     }
 
     // MARK: - Helpers

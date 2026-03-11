@@ -13,6 +13,7 @@ struct GiantLoggerApp: App {
     @StateObject private var stravaService = StravaService.shared
     @StateObject private var navigationEngine = NavigationEngine()
     @StateObject private var watchConnectivity = WatchConnectivityManager.shared
+    @StateObject private var favoritePlacesManager = FavoritePlacesManager()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([Ride.self, RideSample.self, Route.self, RouteWaypoint.self, MaintenanceItem.self, BatterySnapshot.self, ErrorLogEntry.self])
@@ -44,6 +45,7 @@ struct GiantLoggerApp: App {
                 .environmentObject(stravaService)
                 .environmentObject(navigationEngine)
                 .environmentObject(watchConnectivity)
+                .environmentObject(favoritePlacesManager)
                 .onAppear {
                     watchConnectivity.activate()
                     watchConnectivity.onStartRecording = { [weak rideRecorder] in

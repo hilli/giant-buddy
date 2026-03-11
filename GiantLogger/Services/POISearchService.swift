@@ -25,6 +25,8 @@ class POISearchService: ObservableObject {
         case bikeShop = "Bicycle Repair"
         case cafe = "Café"
         case drinkingWater = "Drinking Water"
+        case food = "Food"
+        case layover = "Layover"
 
         var id: String { rawValue }
 
@@ -34,6 +36,8 @@ class POISearchService: ObservableObject {
             case .bikeShop:     return "wrench.and.screwdriver"
             case .cafe:         return "cup.and.saucer"
             case .drinkingWater: return "drop.fill"
+            case .food:         return "fork.knife"
+            case .layover:      return "bench.and.trees"
             }
         }
 
@@ -43,6 +47,8 @@ class POISearchService: ObservableObject {
             case .bikeShop:     return "bicycle repair"
             case .cafe:         return "café coffee shop"
             case .drinkingWater: return "drinking water fountain"
+            case .food:         return "restaurant food"
+            case .layover:      return "rest area scenic viewpoint park bench"
             }
         }
 
@@ -52,6 +58,8 @@ class POISearchService: ObservableObject {
             case .bikeShop:     return .orange
             case .cafe:         return .brown
             case .drinkingWater: return .cyan
+            case .food:         return .red
+            case .layover:      return .green
             }
         }
     }

@@ -9,6 +9,7 @@ struct DashboardView: View {
     @EnvironmentObject var rideRecorder: RideRecorder
     @EnvironmentObject var weatherManager: WeatherManager
     @EnvironmentObject var navigationEngine: NavigationEngine
+    @EnvironmentObject var favoritePlacesManager: FavoritePlacesManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -17,6 +18,7 @@ struct DashboardView: View {
     @State private var lastWeatherFetchLocation: CLLocation?
     @State private var lastWeatherFetchTime: Date?
     @State private var showStopConfirmation = false
+    @State private var showDestinationSearch = false
     @State private var dismissedNavBanner = false
 
     private var isLandscape: Bool {
@@ -67,8 +69,11 @@ struct DashboardView: View {
                         // Weather
                         weatherSection
 
-                        // Record button
-                        recordButton
+                        // Record & Navigate buttons
+                        HStack(spacing: 12) {
+                            recordButton
+                            navigateButton
+                        }
                     }
                     .padding()
                 }
@@ -107,6 +112,11 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showSearch) {
             SearchView()
+        }
+        .sheet(isPresented: $showDestinationSearch) {
+            DestinationSearchView(favoritesManager: favoritePlacesManager) { coordinate, name in
+                startDestinationNavigation(to: coordinate, name: name)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchToRideTab)) { _ in
             showSearch = false
@@ -176,7 +186,10 @@ struct DashboardView: View {
                 VStack(spacing: 12) {
                     Spacer()
                     landscapeSpeedSection
-                    recordButton
+                    HStack(spacing: 8) {
+                        recordButton
+                        navigateButton
+                    }
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -603,6 +616,69 @@ struct DashboardView: View {
             }
         } message: {
             Text("Are you sure you want to stop recording this ride?")
+        }
+    }
+
+    private var navigateButton: some View {
+        Group {
+            if navigationEngine.activeRoute != nil {
+                Button {
+                    navigationEngine.stop()
+                } label: {
+                    HStack {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                        Text("Stop Nav")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.orange)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            } else {
+                Button {
+                    showDestinationSearch = true
+                } label: {
+                    HStack {
+                        Image(systemName: "location.fill")
+                            .font(.title2)
+                        Text("Navigate")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
+    }
+
+    private func startDestinationNavigation(to coordinate: CLLocationCoordinate2D, name: String) {
+        guard let userLocation = locationManager.currentLocation else { return }
+
+        let navRoute = Route(name: name, source: "destination_navigation")
+        let startWP = RouteWaypoint(
+            index: 0,
+            latitude: userLocation.coordinate.latitude,
+            longitude: userLocation.coordinate.longitude,
+            altitude: userLocation.altitude
+        )
+        let endWP = RouteWaypoint(
+            index: 1,
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+        )
+        startWP.isKeyWaypoint = true
+        endWP.isKeyWaypoint = true
+        navRoute.waypoints = [startWP, endWP]
+        navRoute.recalculateStats()
+
+        Task {
+            await navigationEngine.calculateDirections(for: navRoute, from: locationManager.currentLocation)
         }
     }
 
