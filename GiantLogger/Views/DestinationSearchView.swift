@@ -232,6 +232,7 @@ struct DestinationSearchView: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
+                                .tint(.red)
                             }
                             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                 Button {
