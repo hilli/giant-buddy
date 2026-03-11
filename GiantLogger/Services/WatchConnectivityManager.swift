@@ -101,7 +101,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         try? session.updateApplicationContext(context)
     }
     func sendNavigationUpdate(instruction: String, distance: Double, symbol: String,
-                              street: String?, isNavigating: Bool) {
+                              street: String?, isNavigating: Bool, hapticType: String? = nil) {
         guard let session, session.isPaired, session.isWatchAppInstalled else { return }
 
         var message: [String: Any] = [
@@ -112,11 +112,11 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "isNavigating": isNavigating
         ]
         if let street { message["navStreet"] = street }
+        if let hapticType { message["hapticType"] = hapticType }
 
         if session.isReachable {
             session.sendMessage(message, replyHandler: nil)
         } else {
-            // Fall back to application context when Watch is not reachable
             var context = session.applicationContext
             for (key, value) in message { context[key] = value }
             try? session.updateApplicationContext(context)

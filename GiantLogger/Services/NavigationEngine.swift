@@ -570,6 +570,17 @@ class NavigationEngine: ObservableObject {
         if distanceToNextManeuver <= 50 {
             lastHapticStepIndex = currentStepIndex
             triggerTurnHaptic()
+            // Send turn haptic to Watch
+            if let instruction = currentInstruction {
+                watchConnectivity.sendNavigationUpdate(
+                    instruction: instruction.maneuverType.rawValue,
+                    distance: distanceToNextManeuver,
+                    symbol: instruction.maneuverType.sfSymbol,
+                    street: instruction.streetName,
+                    isNavigating: true,
+                    hapticType: "turn"
+                )
+            }
         }
     }
 
@@ -696,6 +707,15 @@ class NavigationEngine: ObservableObject {
         if distance <= arrivalThreshold && !hasArrived {
             hasArrived = true
             triggerArrivalHaptic()
+            // Send arrival haptic to Watch
+            watchConnectivity.sendNavigationUpdate(
+                instruction: "Arrive",
+                distance: 0,
+                symbol: "flag.checkered",
+                street: nil,
+                isNavigating: true,
+                hapticType: "arrival"
+            )
 
             if voiceGuidanceEnabled {
                 let arrival = NavigationInstruction(

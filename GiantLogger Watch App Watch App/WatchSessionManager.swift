@@ -236,7 +236,19 @@ extension WatchSessionManager: WCSessionDelegate {
         Task { @MainActor in
             if message["type"] as? String == "navigation" {
                 updateFromContext(message)
-                WKInterfaceDevice.current().play(.directionUp)
+                if let hapticType = message["hapticType"] as? String {
+                    switch hapticType {
+                    case "turn":
+                        WKInterfaceDevice.current().play(.directionUp)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            WKInterfaceDevice.current().play(.directionUp)
+                        }
+                    case "arrival":
+                        WKInterfaceDevice.current().play(.success)
+                    default:
+                        break
+                    }
+                }
             } else if message["type"] as? String == "recordingStop" {
                 print("WatchSession: received recordingStop message")
                 handleRecordingStop()
