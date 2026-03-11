@@ -84,7 +84,22 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         }
     }
 
-    /// Send navigation instruction update (triggers haptic on Watch).
+    /// Explicitly notify Watch that recording has stopped, using both
+    /// sendMessage (immediate) and updateApplicationContext (persistent).
+    func sendRecordingStop() {
+        guard let session, session.isPaired, session.isWatchAppInstalled else { return }
+
+        // Immediate delivery if Watch is reachable
+        if session.isReachable {
+            session.sendMessage(["type": "recordingStop", "isRecording": false], replyHandler: nil)
+        }
+
+        // Also update context as a reliable fallback
+        var context = session.applicationContext
+        context["isRecording"] = false
+        context["lastPush"] = Date().timeIntervalSince1970
+        try? session.updateApplicationContext(context)
+    }
     func sendNavigationUpdate(instruction: String, distance: Double, symbol: String,
                               street: String?, isNavigating: Bool) {
         guard let session, session.isPaired, session.isWatchAppInstalled else { return }

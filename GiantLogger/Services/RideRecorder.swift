@@ -124,7 +124,8 @@ class RideRecorder: ObservableObject {
         heartRate = 0
         liveActivityManager.endActivity()
 
-        // Notify Watch that recording stopped
+        // Notify Watch that recording stopped (both message + context)
+        watchConnectivity.sendRecordingStop()
         watchConnectivity.sendTelemetry(
             speed: 0, battery: bikeService?.rideData.batteryPercent ?? 0,
             distance: accumulatedDistance, duration: elapsedSeconds,

@@ -40,6 +40,7 @@ class WatchSessionManager: NSObject, ObservableObject {
     private let healthStore = HKHealthStore()
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
+    private var telemetryTimeoutTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -136,6 +137,28 @@ class WatchSessionManager: NSObject, ObservableObject {
         activeCalories = 0
     }
 
+    private func handleRecordingStop() {
+        isRecording = false
+        telemetryTimeoutTask?.cancel()
+        telemetryTimeoutTask = nil
+        stopWorkoutSession()
+        speed = 0
+        cadence = 0
+        watts = 0
+    }
+
+    /// Reset the telemetry timeout. If no update arrives within 10 seconds
+    /// while recording, assume iPhone stopped and auto-stop on Watch.
+    private func resetTelemetryTimeout() {
+        telemetryTimeoutTask?.cancel()
+        telemetryTimeoutTask = Task {
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled, isRecording else { return }
+            print("WatchSession: telemetry timeout — auto-stopping recording")
+            handleRecordingStop()
+        }
+    }
+
     // swiftlint:disable:next cyclomatic_complexity
     private func updateFromContext(_ context: [String: Any]) {
         if let val = context["speed"] as? Double { speed = val }
@@ -152,8 +175,11 @@ class WatchSessionManager: NSObject, ObservableObject {
             isRecording = val
             if val && !wasRecording {
                 startWorkoutSession()
+                resetTelemetryTimeout()
+            } else if val {
+                resetTelemetryTimeout()
             } else if !val && wasRecording {
-                stopWorkoutSession()
+                handleRecordingStop()
             }
         }
         if let val = context["bikeName"] as? String { bikeName = val }
@@ -211,6 +237,9 @@ extension WatchSessionManager: WCSessionDelegate {
             if message["type"] as? String == "navigation" {
                 updateFromContext(message)
                 WKInterfaceDevice.current().play(.directionUp)
+            } else if message["type"] as? String == "recordingStop" {
+                print("WatchSession: received recordingStop message")
+                handleRecordingStop()
             }
         }
     }
