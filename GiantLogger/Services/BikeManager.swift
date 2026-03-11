@@ -83,6 +83,34 @@ class BikeManager: NSObject, ObservableObject {
         }
     }
 
+    /// Attempt to reconnect to the saved device. Tries direct retrieval first,
+    /// falls back to scanning if the peripheral isn't cached by the system.
+    func attemptAutoReconnect() {
+        guard centralManager.state == .poweredOn,
+              connectionState == .disconnected,
+              let savedID = autoConnectIdentifier else { return }
+
+        // Try direct retrieval first (instant, no scan needed)
+        let known = centralManager.retrievePeripherals(withIdentifiers: [savedID])
+        if let peripheral = known.first {
+            debugLog.log("BLE", "Auto-reconnect: found cached peripheral, connecting directly")
+            connect(to: peripheral)
+            return
+        }
+
+        // Also check if already connected (e.g. via background restoration)
+        let connected = centralManager.retrieveConnectedPeripherals(withServices: [serviceUUID])
+        if let peripheral = connected.first(where: { $0.identifier == savedID }) {
+            debugLog.log("BLE", "Auto-reconnect: peripheral already connected, attaching")
+            connect(to: peripheral)
+            return
+        }
+
+        // Fall back to scanning
+        debugLog.log("BLE", "Auto-reconnect: peripheral not cached, starting scan")
+        startScan()
+    }
+
     func connect(to peripheral: CBPeripheral) {
         logger.info("Connecting to peripheral \(peripheral.identifier.uuidString, privacy: .public)")
         debugLog.log("BLE", "Connecting to \(peripheral.identifier.uuidString)")
@@ -162,9 +190,7 @@ extension BikeManager: CBCentralManagerDelegate {
             logger.info("Central state updated: \(central.state.rawValue)")
             debugLog.log("BLE", "Central state: \(central.state.rawValue)")
             if central.state == .poweredOn {
-                if autoConnectIdentifier != nil {
-                    startScan()
-                }
+                attemptAutoReconnect()
             }
         }
     }

@@ -29,6 +29,8 @@ struct GiantLoggerApp: App {
         }
     }()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -49,6 +51,11 @@ struct GiantLoggerApp: App {
                     }
                     watchConnectivity.onStopRecording = { [weak rideRecorder] in
                         rideRecorder?.stopRecording()
+                    }
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        bikeManager.attemptAutoReconnect()
                     }
                 }
                 .onOpenURL { url in
