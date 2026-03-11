@@ -597,18 +597,16 @@ struct DashboardView: View {
                 rideRecorder.startRecording()
             }
         } label: {
-            HStack {
-                Image(systemName: rideRecorder.isRecording ? "stop.circle.fill" : "record.circle")
-                    .font(.title2)
-                Text(rideRecorder.isRecording ? "Stop Recording" : "Start Recording")
-                    .font(.headline)
-            }
+            Label(
+                rideRecorder.isRecording ? "Stop" : "Record",
+                systemImage: rideRecorder.isRecording ? "stop.circle.fill" : "record.circle"
+            )
+            .font(.headline)
             .frame(maxWidth: .infinity)
-            .padding()
-            .background(rideRecorder.isRecording ? Color.red : Color.accentColor)
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.vertical, 14)
         }
+        .buttonStyle(.borderedProminent)
+        .tint(rideRecorder.isRecording ? .red : .accentColor)
         .alert("Stop Recording?", isPresented: $showStopConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Stop", role: .destructive) {
@@ -625,34 +623,24 @@ struct DashboardView: View {
                 Button {
                     navigationEngine.stop()
                 } label: {
-                    HStack {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                        Text("Stop Nav")
-                            .font(.headline)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.orange)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Label("Stop Nav", systemImage: "xmark.circle.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
             } else {
                 Button {
                     showDestinationSearch = true
                 } label: {
-                    HStack {
-                        Image(systemName: "location.fill")
-                            .font(.title2)
-                        Text("Navigate")
-                            .font(.headline)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Label("Navigate", systemImage: "location.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
             }
         }
     }
@@ -736,32 +724,6 @@ struct DashboardView: View {
                 .background(.red)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-
-            // Navigation controls
-            HStack {
-                Button {
-                    navigationEngine.voiceGuidanceEnabled.toggle()
-                    if !navigationEngine.voiceGuidanceEnabled { navigationEngine.stopVoice() }
-                } label: {
-                    Image(systemName: navigationEngine.voiceGuidanceEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                }
-
-                Button {
-                    navigationEngine.hapticFeedbackEnabled.toggle()
-                } label: {
-                    Image(systemName: navigationEngine.hapticFeedbackEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
-                }
-
-                Spacer()
-
-                Button("End Navigation") {
-                    navigationEngine.stop()
-                }
-                .foregroundStyle(.red)
-                .font(.subheadline.bold())
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
         }
     }
 

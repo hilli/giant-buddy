@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject var rideRecorder: RideRecorder
     @EnvironmentObject var workoutManager: WorkoutManager
     @EnvironmentObject var stravaService: StravaService
+    @EnvironmentObject var navigationEngine: NavigationEngine
 
     @AppStorage("autoRecord") private var autoRecord = true
     @AppStorage("recordingInterval") private var recordingInterval = 2.0
@@ -85,6 +86,8 @@ struct SettingsView: View {
                     Text("When auto-connect is enabled, the app will automatically connect to your saved bike when it's in range.")
                 }
 
+                navigationSection
+
                 stravaSection
 
                 safetySection
@@ -121,6 +124,27 @@ struct SettingsView: View {
             .sheet(isPresented: $showingShareSheet) {
                 ShareSheet(items: [DebugLogger.shared.logFileURL])
             }
+        }
+    }
+
+    private var navigationSection: some View {
+        Section {
+            Toggle("Voice Guidance", isOn: Binding(
+                get: { navigationEngine.voiceGuidanceEnabled },
+                set: { enabled in
+                    navigationEngine.voiceGuidanceEnabled = enabled
+                    if !enabled { navigationEngine.stopVoice() }
+                }
+            ))
+
+            Toggle("Haptic Feedback", isOn: Binding(
+                get: { navigationEngine.hapticFeedbackEnabled },
+                set: { navigationEngine.hapticFeedbackEnabled = $0 }
+            ))
+        } header: {
+            Text("Navigation")
+        } footer: {
+            Text("Voice and haptic alerts for upcoming turns during navigation.")
         }
     }
 
