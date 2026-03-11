@@ -17,6 +17,7 @@ struct DashboardView: View {
     @State private var lastWeatherFetchLocation: CLLocation?
     @State private var lastWeatherFetchTime: Date?
     @State private var showStopConfirmation = false
+    @State private var dismissedNavBanner = false
 
     private var isLandscape: Bool {
         verticalSizeClass == .compact
@@ -42,6 +43,11 @@ struct DashboardView: View {
                     VStack(spacing: 16) {
                         // Connection status bar
                         connectionStatusBar
+
+                        // Bike disconnected but still navigating
+                        if !bikeService.isGevConnected && navigationEngine.activeRoute != nil && !dismissedNavBanner {
+                            bikeDisconnectedNavBanner
+                        }
 
                         // Big speed display
                         speedSection
@@ -112,6 +118,11 @@ struct DashboardView: View {
                     lastWeatherFetchLocation = location
                     lastWeatherFetchTime = Date()
                 }
+            }
+        }
+        .onChange(of: bikeService.isGevConnected) { _, connected in
+            if connected {
+                dismissedNavBanner = false
             }
         }
         .onChange(of: locationManager.currentLocation) { _, newLocation in
@@ -338,6 +349,37 @@ struct DashboardView: View {
     }
 
     // MARK: - Components
+
+    private var bikeDisconnectedNavBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "location.fill")
+                .foregroundStyle(.blue)
+            Text("Bike off — still navigating")
+                .font(.subheadline.weight(.medium))
+            Spacer()
+            Button {
+                navigationEngine.stop()
+                dismissedNavBanner = true
+            } label: {
+                Text("Stop")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(.red, in: Capsule())
+            }
+            Button {
+                dismissedNavBanner = true
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 4)
+    }
 
     private var connectionStatusBar: some View {
         HStack {
