@@ -82,11 +82,17 @@ class NavigationEngine: ObservableObject {
     private var lastUpdateLocation: CLLocation?
     private var routeCoordinates: [CLLocationCoordinate2D] = []
     private let watchConnectivity = WatchConnectivityManager.shared
+    private var isDestinationNavigation = false
 
     private let arrivalThreshold: Double = 30 // meters
-    private let offRouteThreshold: Double = 100 // meters
-    private let rerouteDelay: TimeInterval = 10
     private let significantMovement: Double = 3 // meters
+
+    private var offRouteThreshold: Double {
+        isDestinationNavigation ? 50 : 100
+    }
+    private var rerouteDelay: TimeInterval {
+        isDestinationNavigation ? 3 : 10
+    }
 
     private enum AnnouncementThreshold {
         case none, far, near
@@ -116,6 +122,7 @@ class NavigationEngine: ObservableObject {
         guard allWaypoints.count >= 2 else { directionsAvailable = false; return }
         activeRoute = route
         destinationCoordinate = allWaypoints.last!.coordinate
+        isDestinationNavigation = route.source == "destination_navigation" || route.source == "search_navigation"
 
         // Use only key navigation waypoints for MKDirections routing
         var navWaypoints = route.navigationWaypoints
@@ -765,6 +772,7 @@ class NavigationEngine: ObservableObject {
         rerouteFailed = false
         isOffRoute = false
         offRouteDistance = 0
+        isDestinationNavigation = false
 
         // Notify Apple Watch that navigation ended
         watchConnectivity.sendNavigationUpdate(
