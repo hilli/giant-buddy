@@ -18,6 +18,7 @@ struct DestinationSearchView: View {
     @State private var renameText = ""
     @State private var completerResults: [MKLocalSearchCompletion] = []
     @StateObject private var searchCompleter = SearchCompleterDelegate()
+    @State private var searchTask: Task<Void, Never>?
 
     private let onStartNavigation: (CLLocationCoordinate2D, String) -> Void
 
@@ -55,8 +56,17 @@ struct DestinationSearchView: View {
                 selectedCategory = nil
                 showingFavorites = false
                 searchCompleter.update(query: newValue, near: locationManager.currentLocation)
+                // Debounced live search
+                searchTask?.cancel()
+                let query = newValue
+                searchTask = Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                    await poiService.search(query: query, near: locationManager.currentLocation)
+                }
             }
             .onSubmit(of: .search) {
+                searchTask?.cancel()
                 Task {
                     await poiService.search(query: searchText, near: locationManager.currentLocation)
                 }
