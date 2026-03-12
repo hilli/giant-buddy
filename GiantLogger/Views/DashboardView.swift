@@ -466,19 +466,9 @@ struct DashboardView: View {
             GridItem(.flexible()),
             GridItem(.flexible())
         ], spacing: 12) {
-            MetricCard(
-                title: "Motor",
-                value: String(format: "%.0f", bikeService.rideData.watts),
-                unit: "W",
-                icon: "bolt.fill",
-                color: .orange
-            )
-            MetricCard(
-                title: "Rider",
-                value: String(format: "%.0f", bikeService.rideData.torque * bikeService.rideData.cadence * 0.10472),
-                unit: "W",
-                icon: "figure.outdoor.cycle",
-                color: .green
+            CombinedPowerMetricCard(
+                motorPower: bikeService.rideData.watts,
+                riderPower: bikeService.rideData.torque * bikeService.rideData.cadence * 0.10472
             )
             MetricCard(
                 title: "Cadence",
@@ -923,6 +913,40 @@ struct MetricCard: View {
                 .monospacedDigit()
                 .contentTransition(.numericText())
             Text(unit)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct CombinedPowerMetricCard: View {
+    let motorPower: Double
+    let riderPower: Double
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: "bolt.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                Text(String(format: "%.0f", motorPower))
+                    .font(.headline.bold())
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            HStack(spacing: 4) {
+                Image(systemName: "figure.outdoor.cycle")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                Text(String(format: "%.0f", riderPower))
+                    .font(.headline.bold())
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            Text("W")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
