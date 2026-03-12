@@ -22,6 +22,9 @@ class GiantBikeService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var pollingTask: Task<Void, Never>?
     private var connectionTask: Task<Void, Never>?
+    private var bikeInfoFetchTask: Task<Void, Never>?
+    private var bikeInfoFetchGeneration = 0
+    private var pendingBikeInfoRefresh = false
     private var connectGEVAcked = false
     private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "GEV")
     private let debugLog = DebugLogger.shared
@@ -150,35 +153,19 @@ class GiantBikeService: ObservableObject {
     /// Fetch all bike data commands (0x05-0x13) sequentially with delays
     func fetchAllBikeData() {
         guard isGevConnected else { return }
+        if bikeInfoFetchTask != nil {
+            pendingBikeInfoRefresh = true
+            debugLog.log("GEV", "Bike data fetch already running — queued refresh")
+            return
+        }
+        bikeInfoFetchGeneration += 1
+        let fetchGeneration = bikeInfoFetchGeneration
         isFetchingBikeInfo = true
         processedBikeDataCmds.removeAll()
         if bikeInfo == nil { bikeInfo = BikeInfo() }
 
-        Task {
-            for cmd in GiantProtocol.allBikeDataCommands {
-                guard !Task.isCancelled else { break }
-                let data = GiantProtocol.readSingleBikeDataCommand(cmd)
-                let cmdHex = String(format: "0x%02X", cmd.rawValue)
-                debugLog.log("GEV", "TX bikeData cmd=\(cmdHex)")
-                logTX(data)
-                bikeManager?.write(data)
-                try? await Task.sleep(for: .milliseconds(400))
-            }
-            bikeInfo?.lastUpdated = Date()
-            saveBikeInfo()
-            recordBatterySnapshotIfNeeded()
-            recordErrorCodesIfNeeded()
-            if let info = bikeInfo {
-                SharedBikeData.batteryPercent = info.epCapacityPercent
-                SharedBikeData.batteryHealth = info.epLifePercent
-                SharedBikeData.totalOdometer = Double(info.odo)
-                SharedBikeData.totalUsageHours = info.totalUsageHours
-                SharedBikeData.lastConnected = Date()
-                WidgetCenter.shared.reloadAllTimelines()
-                WatchConnectivityManager.shared.pushBikeDataForComplications()
-            }
-            isFetchingBikeInfo = false
-            debugLog.log("GEV", "Bike data fetch complete")
+        bikeInfoFetchTask = Task { [weak self] in
+            await self?.runBikeInfoFetch(generation: fetchGeneration)
         }
     }
 
@@ -225,8 +212,9 @@ class GiantBikeService: ObservableObject {
             guard !Task.isCancelled else { return }
             fetchAllBikeData()
 
-            // Wait for bike data fetch to complete before starting polling
-            try? await Task.sleep(for: .seconds(7))
+            // Wait for bike data fetch to complete before starting polling.
+            let currentBikeInfoFetchTask = bikeInfoFetchTask
+            await currentBikeInfoFetchTask?.value
             guard !Task.isCancelled else { return }
 
             startPolling()
@@ -238,6 +226,12 @@ class GiantBikeService: ObservableObject {
         debugLog.log("GEV", "Disconnected from bike")
         isGevConnected = false
         connectGEVAcked = false
+        bikeInfoFetchTask?.cancel()
+        bikeInfoFetchTask = nil
+        bikeInfoFetchGeneration += 1
+        pendingBikeInfoRefresh = false
+        processedBikeDataCmds.removeAll()
+        isFetchingBikeInfo = false
         connectionTask?.cancel()
         connectionTask = nil
         pollingTask?.cancel()
@@ -364,6 +358,9 @@ class GiantBikeService: ObservableObject {
             debugLog.log("GEV", "Range: all zeros — ignoring (kept previous)")
             return
         }
+        if isFetchingBikeInfo {
+            processedBikeDataCmds.insert(GiantProtocol.Command.bikeDataRideControl.rawValue)
+        }
         rideData.rangeData = rangeData
         UserDefaults.standard.set(rangeData.eco, forKey: "lastRangeKm")
         // Share best available range with widgets
@@ -394,6 +391,9 @@ class GiantBikeService: ObservableObject {
         guard let batteryData else {
             debugLog.log("GEV", "WARN: readBattery parse failed")
             return
+        }
+        if isFetchingBikeInfo {
+            processedBikeDataCmds.insert(GiantProtocol.Command.readBattery.rawValue)
         }
         rideData.batteryPercent = batteryData.capacityPercent
         UserDefaults.standard.set(batteryData.capacityPercent, forKey: "lastBatteryPercent")
@@ -444,6 +444,10 @@ class GiantBikeService: ObservableObject {
     }
 
     private func handleBikeInfoResponse(_ plaintext: [UInt8], label: String) {
+        guard isGevConnected, isFetchingBikeInfo else {
+            debugLog.log("GEV", "BikeInfo: \(label) response outside active fetch — ignoring")
+            return
+        }
         let cmdID = plaintext[0]
 
         // First-response wins: skip if we've already processed this command
@@ -488,6 +492,68 @@ class GiantBikeService: ObservableObject {
 
         bikeInfo = info
         debugLog.log("GEV", "BikeInfo: \(label) parsed")
+    }
+
+    private func runBikeInfoFetch(generation: Int) async {
+        let expectedCommandIDs = Set(GiantProtocol.allBikeDataCommands.map(\.rawValue))
+        var currentGeneration = generation
+
+        while true {
+            processedBikeDataCmds.removeAll()
+
+            for cmd in GiantProtocol.allBikeDataCommands {
+                guard !Task.isCancelled, isGevConnected, bikeInfoFetchGeneration == currentGeneration else {
+                    return
+                }
+                let data = GiantProtocol.readSingleBikeDataCommand(cmd)
+                let cmdHex = String(format: "0x%02X", cmd.rawValue)
+                debugLog.log("GEV", "TX bikeData cmd=\(cmdHex)")
+                logTX(data)
+                bikeManager?.write(data)
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+
+            let responseDeadline = Date().addingTimeInterval(2)
+            while !Task.isCancelled,
+                  isGevConnected,
+                  bikeInfoFetchGeneration == currentGeneration,
+                  processedBikeDataCmds != expectedCommandIDs,
+                  Date() < responseDeadline {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+
+            guard !Task.isCancelled, isGevConnected, bikeInfoFetchGeneration == currentGeneration else {
+                return
+            }
+
+            bikeInfo?.lastUpdated = Date()
+            saveBikeInfo()
+            recordBatterySnapshotIfNeeded()
+            recordErrorCodesIfNeeded()
+            if let info = bikeInfo {
+                SharedBikeData.batteryPercent = info.epCapacityPercent
+                SharedBikeData.batteryHealth = info.epLifePercent
+                SharedBikeData.totalOdometer = Double(info.odo)
+                SharedBikeData.totalUsageHours = info.totalUsageHours
+                SharedBikeData.lastConnected = Date()
+                WidgetCenter.shared.reloadAllTimelines()
+                WatchConnectivityManager.shared.pushBikeDataForComplications()
+            }
+
+            guard bikeInfoFetchGeneration == currentGeneration else { return }
+            if pendingBikeInfoRefresh && isGevConnected {
+                pendingBikeInfoRefresh = false
+                bikeInfoFetchGeneration += 1
+                currentGeneration = bikeInfoFetchGeneration
+                try? await Task.sleep(for: .milliseconds(500))
+                continue
+            }
+
+            isFetchingBikeInfo = false
+            bikeInfoFetchTask = nil
+            debugLog.log("GEV", "Bike data fetch complete")
+            return
+        }
     }
 
     private func logTX(_ data: Data) {

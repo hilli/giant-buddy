@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
     @EnvironmentObject var bikeManager: BikeManager
@@ -10,9 +9,6 @@ struct ContentView: View {
     @EnvironmentObject var crashDetector: CrashDetector
     @EnvironmentObject var stravaService: StravaService
     @EnvironmentObject var navigationEngine: NavigationEngine
-    @Environment(\.modelContext) private var modelContext
-
-    @State private var hasConfigured = false
     @State private var showSearch = false
     @State private var selectedTab = 0
     @AppStorage("crashDetectionEnabled") private var crashDetectionEnabled = false
@@ -81,27 +77,6 @@ struct ContentView: View {
                 } else {
                     crashDetector.stopMonitoring()
                 }
-            }
-        }
-        .onAppear {
-            if !hasConfigured {
-                bikeService.attach(to: bikeManager)
-                bikeService.modelContext = modelContext
-                rideRecorder.configure(
-                    bikeService: bikeService,
-                    locationManager: locationManager,
-                    workoutManager: workoutManager,
-                    stravaService: stravaService,
-                    navigationEngine: navigationEngine,
-                    modelContext: modelContext
-                )
-                if UserDefaults.standard.bool(forKey: "logWorkouts") {
-                    workoutManager.requestAuthorization()
-                }
-                crashDetector.locationProvider = { [weak locationManager] in
-                    locationManager?.currentLocation
-                }
-                hasConfigured = true
             }
         }
     }
