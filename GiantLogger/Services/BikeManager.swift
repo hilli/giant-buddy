@@ -36,6 +36,7 @@ class BikeManager: NSObject, ObservableObject {
 
     // Auto-connect settings
     @Published var autoConnectIdentifier: UUID?
+    private var connectTimeoutTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -83,22 +84,27 @@ class BikeManager: NSObject, ObservableObject {
         }
     }
 
-    /// Attempt to reconnect to the saved device. Tries direct retrieval first,
-    /// falls back to scanning if the peripheral isn't cached by the system.
+    /// Attempt to reconnect to the saved device. Uses both a pending connect
+    /// (instant if system has the peripheral cached) AND an active scan
+    /// (forces the radio to discover the peripheral faster).
     func attemptAutoReconnect() {
         guard centralManager.state == .poweredOn,
-              connectionState == .disconnected,
               let savedID = autoConnectIdentifier else { return }
 
-        // Try direct retrieval first (instant, no scan needed)
-        let known = centralManager.retrievePeripherals(withIdentifiers: [savedID])
-        if let peripheral = known.first {
-            debugLog.log("BLE", "Auto-reconnect: found cached peripheral, connecting directly")
-            connect(to: peripheral)
-            return
+        // If already connected or discovering services, nothing to do
+        if connectionState == .connected || connectionState == .discoveringServices { return }
+
+        // If stuck in .connecting or .scanning for too long, reset and retry
+        if connectionState == .connecting || connectionState == .scanning {
+            debugLog.log("BLE", "Auto-reconnect: resetting stale \(connectionState.rawValue) state")
+            if let peripheral = connectedPeripheral {
+                centralManager.cancelPeripheralConnection(peripheral)
+            }
+            centralManager.stopScan()
+            cleanup()
         }
 
-        // Also check if already connected (e.g. via background restoration)
+        // Check if already connected via another app or background restoration
         let connected = centralManager.retrieveConnectedPeripherals(withServices: [serviceUUID])
         if let peripheral = connected.first(where: { $0.identifier == savedID }) {
             debugLog.log("BLE", "Auto-reconnect: peripheral already connected, attaching")
@@ -106,14 +112,56 @@ class BikeManager: NSObject, ObservableObject {
             return
         }
 
-        // Fall back to scanning
-        debugLog.log("BLE", "Auto-reconnect: peripheral not cached, starting scan")
-        startScan()
+        connectionState = .scanning
+
+        // Issue a pending connect for the known peripheral. CoreBluetooth will
+        // connect when it next sees the peripheral, but this can be slow without
+        // active scanning since iOS waits passively.
+        let known = centralManager.retrievePeripherals(withIdentifiers: [savedID])
+        if let peripheral = known.first {
+            debugLog.log("BLE", "Auto-reconnect: pending connect for cached peripheral")
+            connectedPeripheral = peripheral
+            peripheral.delegate = self
+            centralManager.connect(peripheral, options: nil)
+        }
+
+        // Start active scan in parallel — forces the BLE radio to actively
+        // search for advertisements, dramatically speeding up discovery.
+        debugLog.log("BLE", "Auto-reconnect: starting active scan")
+        centralManager.scanForPeripherals(withServices: [serviceUUID], options: [
+            CBCentralManagerScanOptionAllowDuplicatesKey: false
+        ])
+
+        // Timeout: stop scanning after 15s in foreground
+        connectTimeoutTask?.cancel()
+        if UIApplication.shared.applicationState == .active {
+            connectTimeoutTask = Task {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { return }
+                if connectionState == .scanning {
+                    centralManager.stopScan()
+                    if connectedPeripheral != nil {
+                        // Direct connect is still pending, let it continue
+                        connectionState = .connecting
+                        debugLog.log("BLE", "Scan timed out; pending connect continues")
+                    } else {
+                        connectionState = .disconnected
+                        debugLog.log("BLE", "Scan timed out; no peripheral found")
+                    }
+                }
+            }
+        }
     }
 
     func connect(to peripheral: CBPeripheral) {
         logger.info("Connecting to peripheral \(peripheral.identifier.uuidString, privacy: .public)")
         debugLog.log("BLE", "Connecting to \(peripheral.identifier.uuidString)")
+        connectTimeoutTask?.cancel()
+        // Cancel any stale pending connect for a different peripheral object
+        if let pending = connectedPeripheral, pending !== peripheral,
+           pending.identifier == peripheral.identifier {
+            centralManager.cancelPeripheralConnection(pending)
+        }
         // Set .connecting BEFORE stopping scan to avoid a spurious .disconnected transition
         connectionState = .connecting
         centralManager.stopScan()
@@ -158,6 +206,7 @@ class BikeManager: NSObject, ObservableObject {
     }
 
     private func cleanup() {
+        connectTimeoutTask?.cancel()
         connectedPeripheral = nil
         writeCharacteristic = nil
         notifyCharacteristic = nil
@@ -214,6 +263,8 @@ extension BikeManager: CBCentralManagerDelegate {
         Task { @MainActor in
             logger.info("Connected to peripheral \(peripheral.identifier.uuidString, privacy: .public)")
             debugLog.log("BLE", "Connected to \(peripheral.identifier.uuidString)")
+            connectTimeoutTask?.cancel()
+            centralManager.stopScan()
             connectionState = .discoveringServices
             connectedPeripheralName = peripheral.name?.trimmingCharacters(in: .whitespaces)
             let discoveredName = discoveredDevices.first(where: { $0.peripheral.identifier == peripheral.identifier })?.name
