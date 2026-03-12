@@ -254,6 +254,12 @@ struct DashboardView: View {
                 color: .orange
             )
             CompactMetricCard(
+                value: String(format: "%.0f", bikeService.rideData.torque * bikeService.rideData.cadence * 0.10472),
+                unit: "W",
+                icon: "figure.outdoor.cycle",
+                color: .green
+            )
+            CompactMetricCard(
                 value: String(format: "%.0f", bikeService.rideData.cadence),
                 unit: "rpm",
                 icon: "arrow.clockwise",
@@ -442,11 +448,18 @@ struct DashboardView: View {
             GridItem(.flexible())
         ], spacing: 12) {
             MetricCard(
-                title: "Power",
+                title: "Motor",
                 value: String(format: "%.0f", bikeService.rideData.watts),
                 unit: "W",
                 icon: "bolt.fill",
                 color: .orange
+            )
+            MetricCard(
+                title: "Rider",
+                value: String(format: "%.0f", bikeService.rideData.torque * bikeService.rideData.cadence * 0.10472),
+                unit: "W",
+                icon: "figure.outdoor.cycle",
+                color: .green
             )
             MetricCard(
                 title: "Cadence",

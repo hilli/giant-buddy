@@ -43,6 +43,7 @@ struct RideDetailView: View {
                     speedChart
                     elevationChart
                     powerChart
+                    riderPowerChart
                     batteryChart
                 }
             }
@@ -192,11 +193,11 @@ struct RideDetailView: View {
     private var powerChart: some View {
         VStack(alignment: .leading) {
             HStack {
-                Text("Power")
+                Text("Motor Power")
                     .font(.headline)
                 Spacer()
                 if let s = selectedSample {
-                    Text(String(format: "%.0f W @ %.1f km", s.watts, s.distance))
+                    Text(String(format: "Motor: %.0f W @ %.1f km", s.watts, s.distance))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -213,6 +214,48 @@ struct RideDetailView: View {
                     y: .value("W", sample.watts)
                 )
                 .foregroundStyle(.orange)
+                .interpolationMethod(.catmullRom)
+
+                if let ts = selectedTimestamp {
+                    RuleMark(x: .value("Selected", ts))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 2]))
+                }
+            }
+            .chartXSelection(value: $selectedTimestamp)
+            .frame(height: 150)
+            .chartYAxisLabel("Watts")
+        }
+        .padding()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var riderPowerChart: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Text("Rider Power")
+                    .font(.headline)
+                Spacer()
+                if let s = selectedSample {
+                    let riderW = s.torque * s.cadence * 0.10472
+                    Text(String(format: "Rider: %.0f W @ %.1f km", riderW, s.distance))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Chart(sortedSamples) { sample in
+                let riderW = sample.torque * sample.cadence * 0.10472
+                AreaMark(
+                    x: .value("Time", sample.timestamp),
+                    y: .value("W", riderW)
+                )
+                .foregroundStyle(.green.opacity(0.3))
+
+                LineMark(
+                    x: .value("Time", sample.timestamp),
+                    y: .value("W", riderW)
+                )
+                .foregroundStyle(.green)
                 .interpolationMethod(.catmullRom)
 
                 if let ts = selectedTimestamp {
