@@ -276,7 +276,7 @@ struct RideDetailView: View {
                     .font(.headline)
                 Spacer()
                 if let s = selectedSample {
-                    Text(String(format: "%.0f%% @ %.1f km", s.batteryPercent, s.distance))
+                    Text(String(format: "%d%% @ %.1f km", s.batteryPercent, s.distance))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
