@@ -254,6 +254,22 @@ extension BikeManager: CBCentralManagerDelegate {
             }
             // Auto-connect if matching saved identifier
             if let autoID = autoConnectIdentifier, peripheral.identifier == autoID {
+                if let current = connectedPeripheral {
+                    switch connectionState {
+                    case .scanning, .connecting:
+                        if current === peripheral {
+                            debugLog.log("BLE", "Auto-reconnect: ignoring duplicate discovery for in-flight connection")
+                            return
+                        }
+                    case .discoveringServices, .connected:
+                        if current.identifier == peripheral.identifier {
+                            debugLog.log("BLE", "Auto-reconnect: already attached to matching peripheral")
+                            return
+                        }
+                    case .disconnected:
+                        break
+                    }
+                }
                 connect(to: peripheral)
             }
         }
