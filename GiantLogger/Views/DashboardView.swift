@@ -247,18 +247,37 @@ struct DashboardView: View {
 
     private var compactMetricsRow: some View {
         HStack(spacing: 8) {
-            CompactMetricCard(
-                value: String(format: "%.0f", bikeService.rideData.watts),
-                unit: "W",
-                icon: "bolt.fill",
-                color: .orange
-            )
-            CompactMetricCard(
-                value: String(format: "%.0f", bikeService.rideData.torque * bikeService.rideData.cadence * 0.10472),
-                unit: "W",
-                icon: "figure.outdoor.cycle",
-                color: .green
-            )
+            // Combined motor/rider power card
+            HStack(spacing: 6) {
+                VStack(spacing: 2) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "bolt.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                        Text(String(format: "%.0f", bikeService.rideData.watts))
+                            .font(.callout.bold())
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                    }
+                    HStack(spacing: 2) {
+                        Image(systemName: "figure.outdoor.cycle")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text(String(format: "%.0f", bikeService.rideData.torque * bikeService.rideData.cadence * 0.10472))
+                            .font(.callout.bold())
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                    }
+                }
+                Text("W")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 6)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+
             CompactMetricCard(
                 value: String(format: "%.0f", bikeService.rideData.cadence),
                 unit: "rpm",
