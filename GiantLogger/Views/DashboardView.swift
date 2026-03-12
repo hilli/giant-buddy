@@ -531,6 +531,15 @@ struct DashboardView: View {
                         .font(.callout.bold())
                         .monospacedDigit()
                 }
+                if navigationEngine.activeRoute != nil && navigationEngine.remainingDistance > 0 {
+                    HStack {
+                        Image(systemName: "location.fill")
+                            .foregroundStyle(.blue)
+                        Text(formattedDistance(navigationEngine.remainingDistance) + " left")
+                            .font(.callout.bold())
+                            .monospacedDigit()
+                    }
+                }
             }
             .padding()
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))

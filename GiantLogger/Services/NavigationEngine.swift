@@ -50,6 +50,8 @@ class NavigationEngine: ObservableObject {
     @Published var currentInstruction: NavigationInstruction?
     @Published var nextInstruction: NavigationInstruction?
     @Published var distanceToNextManeuver: Double = 0  // meters
+    @Published var totalRouteDistance: Double = 0       // meters
+    @Published var remainingDistance: Double = 0        // meters
     @Published var isRerouting = false
     @Published var hasArrived = false
     @Published var directionsAvailable = true
@@ -250,6 +252,8 @@ class NavigationEngine: ObservableObject {
         lastAnnouncedDistance = .none
         lastHapticStepIndex = -1
         directionsAvailable = true
+        totalRouteDistance = route.distance
+        remainingDistance = route.distance
         updateInstructions()
         configureAudioSession()
     }
@@ -282,6 +286,12 @@ class NavigationEngine: ObservableObject {
             distanceToNextManeuver = location.distance(
                 from: CLLocation(latitude: stepEndCoord.latitude, longitude: stepEndCoord.longitude)
             )
+            // Remaining = distance to next maneuver + all subsequent steps
+            var remaining = distanceToNextManeuver
+            for i in (currentStepIndex + 1)..<routeSteps.count {
+                remaining += routeSteps[i].distance
+            }
+            remainingDistance = remaining
         }
 
         updateInstructions()
@@ -773,6 +783,8 @@ class NavigationEngine: ObservableObject {
         isOffRoute = false
         offRouteDistance = 0
         isDestinationNavigation = false
+        totalRouteDistance = 0
+        remainingDistance = 0
 
         // Notify Apple Watch that navigation ended
         watchConnectivity.sendNavigationUpdate(

@@ -124,6 +124,11 @@ class RideRecorder: ObservableObject {
         heartRate = 0
         liveActivityManager.endActivity()
 
+        // End navigation if setting is enabled
+        if UserDefaults.standard.bool(forKey: "endNavOnRideEnd") {
+            navigationEngine?.stop()
+        }
+
         // Notify Watch that recording stopped (both message + context)
         watchConnectivity.sendRecordingStop()
         watchConnectivity.sendTelemetry(

@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("savedDeviceName") private var savedDeviceName = ""
     @AppStorage("savedDeviceID") private var savedDeviceID = ""
     @AppStorage("crashDetectionEnabled") private var crashDetectionEnabled = false
+    @AppStorage("endNavOnRideEnd") private var endNavOnRideEnd = false
 
     @State private var showingShareSheet = false
     @State private var logSize = 0
@@ -141,10 +142,12 @@ struct SettingsView: View {
                 get: { navigationEngine.hapticFeedbackEnabled },
                 set: { navigationEngine.hapticFeedbackEnabled = $0 }
             ))
+
+            Toggle("End Navigation on Ride End", isOn: $endNavOnRideEnd)
         } header: {
             Text("Navigation")
         } footer: {
-            Text("Voice and haptic alerts for upcoming turns during navigation.")
+            Text("When enabled, navigation stops automatically when you stop recording a ride.")
         }
     }
 
