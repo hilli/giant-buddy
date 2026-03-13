@@ -149,10 +149,15 @@ class RideRecorder: ObservableObject {
                     let hrSamples = (ride.samples ?? [])
                         .filter { $0.heartRate > 0 }
                         .map { (timestamp: $0.timestamp, bpm: $0.heartRate) }
+                    // Compute average rider power (human pedalling effort)
+                    let riderPowerSamples = (ride.samples ?? []).filter { $0.torque > 0 && $0.cadence > 0 }
+                    let avgRiderPower = riderPowerSamples.isEmpty ? 0.0 :
+                        riderPowerSamples.map { $0.torque * $0.cadence * 0.10472 }.reduce(0, +) / Double(riderPowerSamples.count)
                     workoutManager?.stopWorkout(
                         distance: ride.totalDistance,
                         elevationGain: ride.elevationGain,
-                        avgPower: ride.avgPower,
+                        avgMotorPower: ride.avgPower,
+                        avgRiderPower: avgRiderPower,
                         duration: TimeInterval(ride.duration),
                         heartRateSamples: hrSamples
                     )

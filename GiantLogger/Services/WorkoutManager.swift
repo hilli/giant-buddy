@@ -69,11 +69,12 @@ class WorkoutManager: ObservableObject {
         let builder = HKWorkoutBuilder(healthStore: healthStore, configuration: config, device: .local())
         self.workoutBuilder = builder
         self.routeBuilder = HKWorkoutRouteBuilder(healthStore: healthStore, device: .local())
-        self.workoutStartDate = Date()
+        let now = Date()
+        self.workoutStartDate = now
 
         debugLog.log("HK", "Starting outdoor cycling workout...")
 
-        builder.beginCollection(withStart: Date()) { [weak self] success, error in
+        builder.beginCollection(withStart: now) { [weak self] success, error in
             Task { @MainActor in
                 if let error {
                     self?.debugLog.log("HK", "Begin collection FAILED: \(error.localizedDescription)")
@@ -97,7 +98,16 @@ class WorkoutManager: ObservableObject {
 
     /// Stop the workout and save it with ride summary data.
     /// Chains: add samples → endCollection → finishWorkout → finishRoute.
-    func stopWorkout(distance: Double, elevationGain: Double, avgPower: Double, duration: TimeInterval,
+    /// - Parameters:
+    ///   - distance: Total ride distance in km.
+    ///   - elevationGain: Total elevation gain in meters.
+    ///   - avgMotorPower: Average motor power output in watts.
+    ///   - avgRiderPower: Average human pedalling power in watts (torque × cadence × 2π/60).
+    ///   - duration: Ride duration in seconds.
+    ///   - heartRateSamples: Per-sample HR readings relayed from Apple Watch.
+    func stopWorkout(distance: Double, elevationGain: Double,
+                     avgMotorPower: Double, avgRiderPower: Double,
+                     duration: TimeInterval,
                      heartRateSamples: [(timestamp: Date, bpm: Double)] = []) {
         guard let builder = workoutBuilder else {
             debugLog.log("HK", "stopWorkout called but no active builder")
@@ -112,28 +122,38 @@ class WorkoutManager: ObservableObject {
         routeBuilder = nil
         workoutStartDate = nil
 
-        debugLog.log("HK", "Stopping workout: dist=\(String(format: "%.2f", distance))km power=\(String(format: "%.0f", avgPower))W dur=\(Int(duration))s")
+        debugLog.log("HK", "Stopping workout: dist=\(String(format: "%.2f", distance))km motorW=\(String(format: "%.0f", avgMotorPower)) riderW=\(String(format: "%.0f", avgRiderPower)) dur=\(Int(duration))s")
 
         // Build samples to add
         var samples: [HKSample] = []
 
+        // Distance (in meters — HealthKit distanceCycling expects meters)
         if distance > 0, let distType = HKQuantityType.quantityType(forIdentifier: .distanceCycling) {
+            let distanceMeters = distance * 1000.0
             let sample = HKQuantitySample(
                 type: distType,
-                quantity: HKQuantity(unit: .meterUnit(with: .kilo), doubleValue: distance),
+                quantity: HKQuantity(unit: .meter(), doubleValue: distanceMeters),
                 start: startDate, end: endDate
             )
             samples.append(sample)
+            debugLog.log("HK", "Distance sample: \(String(format: "%.0f", distanceMeters))m (\(String(format: "%.2f", distance))km)")
         }
 
-        if avgPower > 0, let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
-            let kcal = (avgPower * duration) / 4184.0
+        // Calories — prefer rider power (human effort), fall back to motor power
+        let powerForCalories = avgRiderPower > 0 ? avgRiderPower : avgMotorPower
+        if powerForCalories > 0, let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+            // power (W) × duration (s) = energy (J); 1 kcal = 4184 J
+            // Cycling efficiency ~25%, so total metabolic cost ≈ mechanical work / 0.25
+            let mechanicalWork = powerForCalories * duration
+            let metabolicEnergy = mechanicalWork / 0.25
+            let kcal = metabolicEnergy / 4184.0
             let sample = HKQuantitySample(
                 type: energyType,
                 quantity: HKQuantity(unit: .kilocalorie(), doubleValue: kcal),
                 start: startDate, end: endDate
             )
             samples.append(sample)
+            debugLog.log("HK", "Energy sample: \(String(format: "%.0f", kcal))kcal from \(String(format: "%.0f", powerForCalories))W × \(Int(duration))s")
         }
 
         // Add individual heart rate samples

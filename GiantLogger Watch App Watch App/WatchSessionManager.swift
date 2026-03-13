@@ -122,15 +122,10 @@ class WatchSessionManager: NSObject, ObservableObject {
     func stopWorkoutSession() {
         guard let session = workoutSession else { return }
         session.end()
-        workoutBuilder?.endCollection(withEnd: Date()) { [weak self] _, _ in
-            self?.workoutBuilder?.finishWorkout { _, error in
-                if let error {
-                    print("WatchHK: finish workout error: \(error)")
-                } else {
-                    print("WatchHK: workout saved")
-                }
-            }
-        }
+        // Discard the workout — the phone's WorkoutManager is the single source
+        // of truth for HealthKit workouts (it has GPS route, distance, calories).
+        // We only run the watch session to access live HR from the sensors.
+        workoutBuilder?.discardWorkout()
         workoutSession = nil
         workoutBuilder = nil
         heartRate = 0

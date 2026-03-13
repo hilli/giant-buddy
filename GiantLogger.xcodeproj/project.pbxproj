@@ -127,7 +127,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F1296492F5D83D8009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294EF2F5D7B2A009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "dk.hilli.GiantLogger.widget-ios"; sourceTree = "<group>"; };
 		2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "GiantLogger Watch App Watch App"; sourceTree = "<group>"; };
-		2F129F982F5F34AA009FF090 /* GiantLogger Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "GiantLogger Watch App"; sourceTree = "<group>"; };
 		2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F54198C2F5F37FD00138852 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLoggetWatchWidgets; sourceTree = "<group>"; };
 		SRC000000000000000000001 /* GiantLogger */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (EXC000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294F22F5D7BD0009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLogger; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -194,7 +193,6 @@
 				SRC000000000000000000001 /* GiantLogger */,
 				2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */,
 				2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */,
-				2F129F982F5F34AA009FF090 /* GiantLogger Watch App */,
 				2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */,
 				2F1294D62F5D7B29009FF090 /* Frameworks */,
 				PRD000000000000000000001 /* Products */,
