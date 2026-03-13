@@ -422,12 +422,9 @@ class GiantBikeService: ObservableObject {
         rideData.cadence = parsed.cadence
         rideData.assistCurrent = parsed.assistCurrent
         rideData.lightMode = parsed.lightMode
-        // Calculate power from torque × cadence (P = τ × ω = τ × rpm × 2π/60)
-        if parsed.cadence > 0 && parsed.torque > 0 {
-            rideData.watts = parsed.torque * parsed.cadence * 2.0 * .pi / 60.0
-        } else {
-            rideData.watts = 0
-        }
+        // Do NOT overwrite rideData.watts here — let readRidingData (0x1B) provide
+        // the bike's native watts value. Rider power is calculated independently
+        // in the UI from torque × cadence.
         if parsed.errorCode != 0 {
             rideData.errorCode = parsed.errorCode
         }
