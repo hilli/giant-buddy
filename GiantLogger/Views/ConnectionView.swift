@@ -254,8 +254,12 @@ struct ConnectionView: View {
 
     private var scanSection: some View {
         Section {
-            if bikeManager.connectionState == .disconnected || bikeManager.connectionState == .scanning {
+            if bikeManager.connectionState != .connected && bikeManager.connectionState != .discoveringServices {
                 Button {
+                    if bikeManager.connectionState == .connecting {
+                        // Reset stale connecting state before re-scanning
+                        bikeManager.disconnect()
+                    }
                     bikeManager.startScan()
                 } label: {
                     HStack {

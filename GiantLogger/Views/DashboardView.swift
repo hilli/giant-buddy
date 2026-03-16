@@ -82,8 +82,11 @@ struct DashboardView: View {
                         // Already connected — refresh telemetry
                         bikeService.fetchAllBikeData()
                         try? await Task.sleep(for: .seconds(7))
-                    } else if bikeManager.connectionState == .disconnected {
-                        // Not connected — scan and auto-connect
+                    } else {
+                        // Not connected — reset any stale state, scan and auto-connect
+                        if bikeManager.connectionState == .connecting {
+                            bikeManager.disconnect()
+                        }
                         bikeManager.startScan()
                         // Wait up to 10s for a device to be discovered and connected
                         for _ in 0..<100 {
