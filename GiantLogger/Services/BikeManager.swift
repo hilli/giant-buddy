@@ -153,6 +153,27 @@ class BikeManager: NSObject, ObservableObject {
         }
     }
 
+    /// Issue a pending connect for the saved peripheral so iOS can
+    /// re-launch the app in the background when the bike appears.
+    /// Safe to call even if already connected (will no-op).
+    func ensurePendingConnect() {
+        guard centralManager.state == .poweredOn,
+              let savedID = autoConnectIdentifier else { return }
+        if connectionState == .connected || connectionState == .discoveringServices { return }
+
+        let peripherals = centralManager.retrievePeripherals(withIdentifiers: [savedID])
+        guard let peripheral = peripherals.first else {
+            debugLog.log("BLE", "ensurePendingConnect: no cached peripheral for \(savedID)")
+            return
+        }
+        debugLog.log("BLE", "ensurePendingConnect: issuing pending connect for background wake-up")
+        connectedPeripheral = peripheral
+        peripheral.delegate = self
+        centralManager.connect(peripheral, options: [
+            CBConnectPeripheralOptionNotifyOnConnectionKey: true
+        ])
+    }
+
     func connect(to peripheral: CBPeripheral) {
         logger.info("Connecting to peripheral \(peripheral.identifier.uuidString, privacy: .public)")
         debugLog.log("BLE", "Connecting to \(peripheral.identifier.uuidString)")

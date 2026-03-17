@@ -79,6 +79,8 @@ struct GiantLoggerApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
                         bikeManager.attemptAutoReconnect()
+                    } else if newPhase == .background {
+                        bikeManager.ensurePendingConnect()
                     }
                 }
                 .onOpenURL { url in
