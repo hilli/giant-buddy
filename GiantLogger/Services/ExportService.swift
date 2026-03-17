@@ -17,7 +17,7 @@ enum ExportService {
                 String(format: "%.1f", s.speed),
                 String(format: "%.1f", s.cadence),
                 String(format: "%.2f", s.torque),
-                String(format: "%.1f", s.watts),
+                String(format: "%.1f", s.motorWatts),
                 "\(s.batteryPercent)",
                 String(format: "%.1f", s.distance),
                 "\(s.rideTime)",
@@ -71,7 +71,7 @@ enum ExportService {
                         <gpxtpx:speed>\(String(format: "%.1f", sample.speed / 3.6))</gpxtpx:speed>
                         <gpxtpx:hr>\(sample.batteryPercent)</gpxtpx:hr>
                       </gpxtpx:TrackPointExtension>
-                      <power>\(String(format: "%.0f", sample.watts))</power>
+                      <power>\(String(format: "%.0f", sample.motorWatts))</power>
                       <cadence>\(String(format: "%.0f", sample.cadence))</cadence>
                     </extensions>
                   </trkpt>

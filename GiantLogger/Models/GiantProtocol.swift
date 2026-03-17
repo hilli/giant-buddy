@@ -516,7 +516,8 @@ struct RideData: Equatable {
     var speed: Double = 0        // km/h
     var cadence: Double = 0      // RPM
     var torque: Double = 0       // Nm
-    var watts: Double = 0        // W
+    var watts: Double = 0        // W (bike native from 0x1B)
+    var motorWatts: Double = 0   // W (calculated: assistCurrent × estimated voltage)
     var batteryPercent: Int = 0  // 0-100
     var distance: Double = 0     // km
     var rideTime: Int = 0        // seconds
@@ -528,6 +529,11 @@ struct RideData: Equatable {
     /// Best available range estimate: eco (max range) when all modes are available
     var range: Int {
         rangeData?.eco ?? 0
+    }
+
+    /// Estimated battery voltage from percentage (36V nominal, 10S Li-ion: 30V–42V)
+    var estimatedVoltage: Double {
+        30.0 + (Double(batteryPercent) / 100.0) * 12.0
     }
 }
 

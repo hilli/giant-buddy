@@ -257,7 +257,7 @@ struct DashboardView: View {
                         Image(systemName: "bolt.fill")
                             .font(.caption2)
                             .foregroundStyle(.orange)
-                        Text(String(format: "%.0f", bikeService.rideData.watts))
+                        Text(String(format: "%.0f", bikeService.rideData.motorWatts))
                             .font(.callout.bold())
                             .monospacedDigit()
                             .contentTransition(.numericText())
@@ -470,7 +470,7 @@ struct DashboardView: View {
             GridItem(.flexible())
         ], spacing: 12) {
             CombinedPowerMetricCard(
-                motorPower: bikeService.rideData.watts,
+                motorPower: bikeService.rideData.motorWatts,
                 riderPower: bikeService.rideData.torque * bikeService.rideData.cadence * 0.10472
             )
             MetricCard(

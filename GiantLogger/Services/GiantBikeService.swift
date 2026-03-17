@@ -338,10 +338,14 @@ class GiantBikeService: ObservableObject {
     private func handleReadRidingData(_ plaintext: [UInt8]) {
         guard let parsed = GiantProtocol.parseRidingData(plaintext) else { return }
         var updated = parsed
+        // Preserve fields from diagnosticSyncDrive (0x16) that readRidingData doesn't include
         updated.rangeData = rideData.rangeData
+        updated.assistCurrent = rideData.assistCurrent
+        updated.lightMode = rideData.lightMode
+        updated.motorWatts = rideData.motorWatts
         rideData = updated
         logger.debug("Parsed riding data: speed=\(updated.speed) battery=\(updated.batteryPercent)")
-        debugLog.log("GEV", "Riding: speed=\(updated.speed) battery=\(updated.batteryPercent)% cadence=\(updated.cadence) watts=\(updated.watts)")
+        debugLog.log("GEV", "Riding: speed=\(updated.speed) battery=\(updated.batteryPercent)% cadence=\(updated.cadence) watts=\(updated.watts) motorW=\(String(format: "%.0f", updated.motorWatts))")
     }
 
     private func handleRemainingRange(_ plaintext: [UInt8]) {
@@ -422,14 +426,13 @@ class GiantBikeService: ObservableObject {
         rideData.cadence = parsed.cadence
         rideData.assistCurrent = parsed.assistCurrent
         rideData.lightMode = parsed.lightMode
-        // Do NOT overwrite rideData.watts here — let readRidingData (0x1B) provide
-        // the bike's native watts value. Rider power is calculated independently
-        // in the UI from torque × cadence.
+        // Calculate motor power from current × estimated voltage
+        rideData.motorWatts = parsed.assistCurrent * rideData.estimatedVoltage
         if parsed.errorCode != 0 {
             rideData.errorCode = parsed.errorCode
         }
-        logger.debug("SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) watts=\(self.rideData.watts) current=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
-        debugLog.log("GEV", "SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) watts=\(String(format: "%.0f", self.rideData.watts)) acur=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
+        logger.debug("SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) motorW=\(String(format: "%.0f", self.rideData.motorWatts)) current=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
+        debugLog.log("GEV", "SyncDrive: speed=\(parsed.speed) torque=\(parsed.torque) cadence=\(parsed.cadence) motorW=\(String(format: "%.0f", self.rideData.motorWatts)) acur=\(parsed.assistCurrent)A light=\(parsed.lightMode)")
     }
 
     private func handleDiagnosticEnergyPak(_ plaintext: [UInt8]) {

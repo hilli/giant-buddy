@@ -268,7 +268,7 @@ class RideRecorder: ObservableObject {
             elapsed: elapsedSeconds,
             battery: bikeService.rideData.batteryPercent,
             avgSpeed: avg,
-            power: bikeService.rideData.watts
+            power: bikeService.rideData.motorWatts
         )
 
         // Send telemetry to Apple Watch (including navigation state)
@@ -280,7 +280,7 @@ class RideRecorder: ObservableObject {
             distance: accumulatedDistance,
             duration: elapsedSeconds,
             cadence: bikeService.rideData.cadence,
-            watts: bikeService.rideData.watts,
+            watts: bikeService.rideData.motorWatts,
             isRecording: true,
             bikeName: SharedBikeData.bikeName,
             isNavigating: isNav,

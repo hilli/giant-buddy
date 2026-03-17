@@ -44,9 +44,9 @@ final class Ride {
         avgSpeed = movingSamples.isEmpty ? 0 : movingSamples.map(\.speed).reduce(0, +) / Double(movingSamples.count)
         maxSpeed = sorted.map(\.speed).max() ?? 0
 
-        let powerSamples = sorted.filter { $0.watts > 0 }
-        avgPower = powerSamples.isEmpty ? 0 : powerSamples.map(\.watts).reduce(0, +) / Double(powerSamples.count)
-        maxPower = sorted.map(\.watts).max() ?? 0
+        let powerSamples = sorted.filter { $0.motorWatts > 0 }
+        avgPower = powerSamples.isEmpty ? 0 : powerSamples.map(\.motorWatts).reduce(0, +) / Double(powerSamples.count)
+        maxPower = sorted.map(\.motorWatts).max() ?? 0
 
         let cadenceSamples = sorted.filter { $0.cadence > 0 }
         avgCadence = cadenceSamples.isEmpty ? 0 : cadenceSamples.map(\.cadence).reduce(0, +) / Double(cadenceSamples.count)
@@ -79,7 +79,8 @@ final class RideSample {
     var speed: Double = 0            // km/h
     var cadence: Double = 0          // RPM
     var torque: Double = 0           // Nm
-    var watts: Double = 0            // W
+    var watts: Double = 0            // W (bike native from 0x1B)
+    var motorWatts: Double = 0       // W (calculated: assistCurrent × estimated voltage)
     var batteryPercent: Int = 0      // 0-100
     var distance: Double = 0         // km
     var rideTime: Int = 0            // seconds
@@ -107,6 +108,7 @@ final class RideSample {
         self.cadence = rideData.cadence
         self.torque = rideData.torque
         self.watts = rideData.watts
+        self.motorWatts = rideData.motorWatts
         self.batteryPercent = rideData.batteryPercent
         self.distance = rideData.distance
         self.rideTime = rideData.rideTime

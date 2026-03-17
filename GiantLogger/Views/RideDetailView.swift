@@ -197,7 +197,7 @@ struct RideDetailView: View {
                     .font(.headline)
                 Spacer()
                 if let s = selectedSample {
-                    Text(String(format: "Motor: %.0f W @ %.1f km", s.watts, s.distance))
+                    Text(String(format: "Motor: %.0f W @ %.1f km", s.motorWatts, s.distance))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -205,13 +205,13 @@ struct RideDetailView: View {
             Chart(sortedSamples) { sample in
                 AreaMark(
                     x: .value("Time", sample.timestamp),
-                    y: .value("W", sample.watts)
+                    y: .value("W", sample.motorWatts)
                 )
                 .foregroundStyle(.orange.opacity(0.3))
 
                 LineMark(
                     x: .value("Time", sample.timestamp),
-                    y: .value("W", sample.watts)
+                    y: .value("W", sample.motorWatts)
                 )
                 .foregroundStyle(.orange)
                 .interpolationMethod(.catmullRom)
