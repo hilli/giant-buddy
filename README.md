@@ -28,7 +28,7 @@ It is the iOS/watchOS evolution of [giant-esp32](https://github.com/hilli/giant-
 
 ### Routes, Search, and Navigation
 
-- Import GPX routes into **My Routes**
+- Import GPX routes into **My Routes** or open GPX files directly from other apps (Files, Safari, email, AirDrop)
 - Create and edit routes directly on the map
 - Search by address or place name
 - Browse POI shortcuts for common ride stops
@@ -41,6 +41,7 @@ It is the iOS/watchOS evolution of [giant-esp32](https://github.com/hilli/giant-
 ### Ride Recording, History, and Analytics
 
 - Record GPS and bike telemetry in the background
+- Auto-record on connect: recording starts when the bike pairs, even from a background launch; a local notification confirms it began
 - Store rides locally with SwiftData
 - Browse ride history with summary cards and route maps
 - Inspect ride details with interactive charts for speed, motor power, rider power, elevation, and battery
@@ -99,6 +100,7 @@ This repository also includes a `Taskfile.yaml` with common workflows:
 
 - **CSV export** includes ride telemetry plus GPS columns for external analysis
 - **GPX export** includes the recorded track with elevation, cadence, speed, and power-related fields
+- **GPX import** — open `.gpx` files from Files, Safari downloads, email, AirDrop, or any app that supports "Open In"
 - Recorded rides can be saved back into the app as reusable routes
 
 ## Protocol

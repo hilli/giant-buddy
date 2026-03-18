@@ -25,9 +25,9 @@ Import GPX routes, create new routes directly on the map, or search for a destin
 During navigation, Giant Buddy shows remaining distance, completion progress, and your position on the route. If you go off-route, it detects the deviation and reroutes automatically. Optional voice prompts and haptic feedback keep you informed without looking at the screen.
 
 RIDE RECORDING AND HISTORY
-Record GPS tracks alongside full bike telemetry in the background — even with your phone in your pocket. Browse your ride history with summary cards and route maps. Open any ride to explore interactive charts for speed, motor power, rider power, elevation, and battery over time. Scrub through the timeline to inspect any moment of the ride.
+Record GPS tracks alongside full bike telemetry in the background — even with your phone in your pocket. When auto-record is on, recording starts as soon as the bike connects, whether the app is open or not; a notification confirms the recording began. Browse your ride history with summary cards and route maps. Open any ride to explore interactive charts for speed, motor power, rider power, elevation, and battery over time. Scrub through the timeline to inspect any moment of the ride.
 
-Export rides as CSV for data analysis or GPX for Strava and Komoot. Upload directly to Strava from the app. Save any recorded ride back as a reusable route for next time.
+Export rides as CSV for data analysis or GPX for Strava and Komoot. Upload directly to Strava from the app. Save any recorded ride back as a reusable route for next time. Open GPX files from other apps — tap a .gpx file in Files, Safari, email, or AirDrop and Giant Buddy imports it as a new route.
 
 ANALYTICS
 See your riding trends across a week, month, year, or all time. Track total distance, ride count, average speed, elevation gain, battery consumption, efficiency, and personal records.
