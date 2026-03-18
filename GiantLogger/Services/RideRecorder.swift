@@ -164,10 +164,17 @@ class RideRecorder: ObservableObject {
             isRecording: false, bikeName: SharedBikeData.bikeName
         )
 
-        // Discard rides where user hasn't moved (< 10m) or has no samples
+        // Discard rides with no samples, no meaningful movement, or no GPS data
         if let ride = currentRide {
             ride.computeSummary()
-            if (ride.samples ?? []).isEmpty || accumulatedDistance < 0.01 {
+            let samples = ride.samples ?? []
+            let hasGPS = samples.contains { $0.latitude != 0 || $0.longitude != 0 }
+            let shouldDiscard = samples.isEmpty
+                || accumulatedDistance < 0.01
+                || !hasGPS
+            if shouldDiscard {
+                debugLog.log("Recorder", "Discarding ride: \(samples.count) samples, \(String(format: "%.3f", accumulatedDistance)) km, gps=\(hasGPS)")
+                if logWorkouts { workoutManager?.discardWorkout() }
                 modelContext?.delete(ride)
             } else {
                 // Save workout to HealthKit if enabled

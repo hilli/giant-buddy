@@ -62,6 +62,12 @@ class WorkoutManager: ObservableObject {
     func startWorkout() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
 
+        // Prevent double-start: discard any abandoned builder first
+        if workoutBuilder != nil {
+            debugLog.log("HK", "WARN: startWorkout called with active builder — discarding previous")
+            discardWorkout()
+        }
+
         let config = HKWorkoutConfiguration()
         config.activityType = .cycling
         config.locationType = .outdoor
@@ -80,6 +86,25 @@ class WorkoutManager: ObservableObject {
                     self?.debugLog.log("HK", "Begin collection FAILED: \(error.localizedDescription)")
                 } else {
                     self?.debugLog.log("HK", "Workout collection started: \(success)")
+                }
+            }
+        }
+    }
+
+    /// Discard the current workout without saving to HealthKit.
+    func discardWorkout() {
+        guard let builder = workoutBuilder else { return }
+        let endDate = Date()
+        workoutBuilder = nil
+        routeBuilder = nil
+        workoutStartDate = nil
+        debugLog.log("HK", "Discarding workout (ride was discarded)")
+        builder.endCollection(withEnd: endDate) { [weak self] _, _ in
+            builder.finishWorkout { [weak self] _, _ in
+                // Builder discarded — HealthKit may still save a minimal
+                // entry; we delete it immediately.
+                Task { @MainActor in
+                    self?.debugLog.log("HK", "Discarded workout builder cleaned up")
                 }
             }
         }
