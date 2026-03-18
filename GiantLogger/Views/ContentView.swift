@@ -11,6 +11,8 @@ struct ContentView: View {
     @EnvironmentObject var navigationEngine: NavigationEngine
     @State private var showSearch = false
     @State private var selectedTab = 0
+    @State private var gpxImportMessage: String?
+    @State private var showGPXImportAlert = false
     @AppStorage("crashDetectionEnabled") private var crashDetectionEnabled = false
 
     var body: some View {
@@ -79,10 +81,26 @@ struct ContentView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .gpxImportResult)) { notification in
+            guard let result = notification.object as? GPXImportResult else { return }
+            if let name = result.routeName {
+                gpxImportMessage = "Imported route: \(name)"
+                selectedTab = 1
+            } else {
+                gpxImportMessage = result.error ?? "Import failed"
+            }
+            showGPXImportAlert = true
+        }
+        .alert("GPX Import", isPresented: $showGPXImportAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(gpxImportMessage ?? "")
+        }
     }
 }
 
 extension Notification.Name {
     static let switchToRideTab = Notification.Name("switchToRideTab")
     static let switchToHistoryTab = Notification.Name("switchToHistoryTab")
+    static let gpxImportResult = Notification.Name("gpxImportResult")
 }

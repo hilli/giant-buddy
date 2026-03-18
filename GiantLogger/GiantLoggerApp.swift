@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import OSLog
 
 @main
 struct GiantLoggerApp: App {
@@ -137,6 +138,44 @@ struct GiantLoggerApp: App {
         _favoritePlacesManager = StateObject(wrappedValue: services.favoritePlacesManager)
     }
 
+    // MARK: - GPX Import
+
+    private static let importLogger = Logger(
+        subsystem: "dk.hilli.GiantLogger", category: "GPXImport"
+    )
+
+    /// Import a GPX file from another app (Files, Safari, email, etc.)
+    private static func importGPXFile(_ url: URL) {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let route = try GPXParser.parse(data: data)
+            let context = sharedModelContainer.mainContext
+            context.insert(route)
+            try context.save()
+
+            importLogger.info("Imported GPX route: \(route.name)")
+            NotificationCenter.default.post(
+                name: .gpxImportResult,
+                object: GPXImportResult(
+                    routeName: route.name,
+                    error: nil
+                )
+            )
+        } catch {
+            importLogger.error("GPX import failed: \(error.localizedDescription)")
+            NotificationCenter.default.post(
+                name: .gpxImportResult,
+                object: GPXImportResult(
+                    routeName: nil,
+                    error: error.localizedDescription
+                )
+            )
+        }
+    }
+
     // MARK: - Scene
 
     var body: some Scene {
@@ -161,16 +200,27 @@ struct GiantLoggerApp: App {
                     }
                 }
                 .onOpenURL { url in
-                    guard url.scheme == "giantlogger" else { return }
-                    if url.host == "lastride" {
-                        NotificationCenter.default.post(name: .switchToHistoryTab, object: nil)
-                    } else {
-                        Task {
-                            await stravaService.handleCallback(url)
+                    if url.scheme == "giantlogger" {
+                        if url.host == "lastride" {
+                            NotificationCenter.default.post(
+                                name: .switchToHistoryTab, object: nil
+                            )
+                        } else {
+                            Task { await stravaService.handleCallback(url) }
                         }
+                    } else if url.isFileURL,
+                              url.pathExtension.lowercased() == "gpx" {
+                        Self.importGPXFile(url)
                     }
                 }
         }
         .modelContainer(Self.sharedModelContainer)
     }
+}
+
+// MARK: - GPX Import Result
+
+struct GPXImportResult {
+    let routeName: String?
+    let error: String?
 }
