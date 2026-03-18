@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import OSLog
 import SwiftData
+import UIKit
 import WidgetKit
 
 /// High-level interface to the Giant e-bike. Sends commands, parses responses,
@@ -178,6 +179,17 @@ class GiantBikeService: ObservableObject {
         sendConnect()
 
         connectionTask = Task {
+            // Request extended background execution time so iOS doesn't suspend
+            // the app before the GEV handshake and initial data fetch complete.
+            let bgTaskID = UIApplication.shared.beginBackgroundTask {
+                self.debugLog.log("GEV", "WARN: background task expired during connection")
+            }
+            defer {
+                if bgTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTaskID)
+                }
+            }
+
             // Wait up to 5 seconds for connectGEV ACK (matching Android timeout)
             for _ in 0..<50 {
                 try? await Task.sleep(for: .milliseconds(100))

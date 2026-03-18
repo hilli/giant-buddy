@@ -4,6 +4,9 @@ import Combine
 import CoreLocation
 import ActivityKit
 import WidgetKit
+import UserNotifications
+import UIKit
+import OSLog
 
 /// Records ride telemetry + GPS samples and manages ride lifecycle.
 @MainActor
@@ -41,6 +44,8 @@ class RideRecorder: ObservableObject {
     private var movingSpeedSum: Double = 0
     private var movingSpeedCount: Int = 0
     private let watchConnectivity = WatchConnectivityManager.shared
+    private let debugLog = DebugLogger.shared
+    private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "Recorder")
 
     init() {
         UserDefaults.standard.register(defaults: ["autoRecord": true])
@@ -57,14 +62,18 @@ class RideRecorder: ObservableObject {
         self.navigationEngine = navigationEngine
         self.modelContext = modelContext
 
+        requestNotificationPermission()
+
         // Auto-start recording when GEV connects; always stop on disconnect
         bikeService.$isGevConnected
             .receive(on: DispatchQueue.main)
             .sink { [weak self] connected in
                 guard let self else { return }
                 if connected && self.autoRecord && !self.isRecording {
+                    self.debugLog.log("Recorder", "Auto-record triggered by GEV connect")
                     self.startRecording()
                 } else if !connected && self.isRecording {
+                    self.debugLog.log("Recorder", "Auto-stop triggered by GEV disconnect")
                     self.stopRecording()
                 }
             }
@@ -72,7 +81,15 @@ class RideRecorder: ObservableObject {
     }
 
     func startRecording() {
-        guard !isRecording, let modelContext else { return }
+        if isRecording {
+            debugLog.log("Recorder", "startRecording skipped — already recording")
+            return
+        }
+        guard let modelContext else {
+            logger.warning("startRecording failed — modelContext is nil (services not configured?)")
+            debugLog.log("Recorder", "WARN: startRecording failed — modelContext nil")
+            return
+        }
 
         let ride = Ride()
         modelContext.insert(ride)
@@ -89,6 +106,12 @@ class RideRecorder: ObservableObject {
         locationManager?.startTracking()
         if logWorkouts { workoutManager?.startWorkout() }
         liveActivityManager.startActivity()
+
+        debugLog.log("Recorder", "Recording started")
+        postBackgroundNotification(
+            title: "Ride Recording Started",
+            body: "Connected to \(SharedBikeData.bikeName) — recording GPS and telemetry."
+        )
 
         // Notify Watch that recording started
         watchConnectivity.sendTelemetry(
@@ -123,6 +146,9 @@ class RideRecorder: ObservableObject {
         isRecording = false
         heartRate = 0
         liveActivityManager.endActivity()
+
+        let distKm = String(format: "%.2f", accumulatedDistance)
+        debugLog.log("Recorder", "Recording stopped — \(sampleCount) samples, \(distKm) km")
 
         // End navigation if setting is enabled
         if UserDefaults.standard.bool(forKey: "endNavOnRideEnd") {
@@ -180,6 +206,14 @@ class RideRecorder: ObservableObject {
             }
         }
         try? modelContext?.save()
+
+        // Notify user if app is in background
+        let distStr = String(format: "%.1f km", accumulatedDistance)
+        let mins = elapsedSeconds / 60
+        postBackgroundNotification(
+            title: "Ride Recording Stopped",
+            body: "Recorded \(distStr) in \(mins) min."
+        )
 
         locationManager?.stopTracking()
         currentRide = nil
@@ -288,18 +322,47 @@ class RideRecorder: ObservableObject {
             navDistance: navigationEngine?.distanceToNextManeuver ?? 0,
             navSymbol: navInstr?.maneuverType.sfSymbol ?? "arrow.up",
             navStreet: navInstr?.streetName
+         )
+    }
+}
+
+// MARK: - Background Notifications
+
+extension RideRecorder {
+
+    /// Request notification permission (called once during configure).
+    func requestNotificationPermission() {
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    /// Post a local notification only when the app is in the background.
+    func postBackgroundNotification(title: String, body: String) {
+        guard UIApplication.shared.applicationState != .active else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "ride-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
         )
+        UNUserNotificationCenter.current().add(request)
     }
 
     /// Haversine distance in kilometers between two GPS coordinates.
-    private static func haversineDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
-        let R = 6371.0 // Earth radius in km
+    static func haversineDistance(
+        lat1: Double, lon1: Double,
+        lat2: Double, lon2: Double
+    ) -> Double {
+        let earthRadius = 6371.0
         let dLat = (lat2 - lat1) * .pi / 180
         let dLon = (lon2 - lon1) * .pi / 180
-        let a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
-                sin(dLon / 2) * sin(dLon / 2)
-        let c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return R * c
+        let sinHalf = sin(dLat / 2) * sin(dLat / 2) +
+            cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
+            sin(dLon / 2) * sin(dLon / 2)
+        let arc = 2 * atan2(sqrt(sinHalf), sqrt(1 - sinHalf))
+        return earthRadius * arc
     }
 }
