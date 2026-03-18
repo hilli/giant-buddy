@@ -44,14 +44,27 @@ struct RideListView: View {
 struct RideRowView: View {
     let ride: Ride
 
+    /// Display name: ride.name if set, otherwise formatted date
+    private var displayName: String {
+        ride.name.isEmpty
+            ? ride.startDate.formatted(date: .abbreviated, time: .omitted)
+            : ride.name
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(ride.startDate, style: .date)
+                Text(displayName)
                     .font(.headline)
                 Spacer()
                 Text(ride.startDate, style: .time)
                     .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !ride.name.isEmpty {
+                Text(ride.startDate, style: .date)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 

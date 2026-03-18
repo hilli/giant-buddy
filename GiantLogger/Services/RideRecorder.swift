@@ -210,6 +210,9 @@ class RideRecorder: ObservableObject {
                 SharedBikeData.lastRideAvgSpeed = ride.avgSpeed
                 SharedBikeData.lastRideElevationGain = ride.elevationGain
                 WidgetCenter.shared.reloadAllTimelines()
+
+                // Reverse-geocode start/end to generate a ride name
+                resolveRideName(for: ride, samples: samples)
             }
         }
         try? modelContext?.save()
@@ -371,5 +374,55 @@ extension RideRecorder {
             sin(dLon / 2) * sin(dLon / 2)
         let arc = 2 * atan2(sqrt(sinHalf), sqrt(1 - sinHalf))
         return earthRadius * arc
+    }
+}
+
+// MARK: - Ride Naming (Reverse Geocoding)
+
+extension RideRecorder {
+
+    /// Resolve a human-readable ride name from start/end GPS coordinates.
+    /// Falls back to "Giant eBike Ride" on failure or missing data.
+    func resolveRideName(for ride: Ride, samples: [RideSample]) {
+        let gpsSamples = samples.filter { $0.latitude != 0 || $0.longitude != 0 }
+        guard let first = gpsSamples.first, let last = gpsSamples.last else {
+            ride.name = "Giant eBike Ride"
+            try? modelContext?.save()
+            return
+        }
+
+        let startLoc = CLLocation(latitude: first.latitude, longitude: first.longitude)
+        let endLoc = CLLocation(latitude: last.latitude, longitude: last.longitude)
+        let geocoder = CLGeocoder()
+
+        Task {
+            let startName = await reverseGeocode(geocoder: geocoder, location: startLoc)
+            let endName = await reverseGeocode(geocoder: geocoder, location: endLoc)
+
+            await MainActor.run {
+                if let start = startName, let end = endName, start != end {
+                    ride.name = "\(start) → \(end)"
+                } else if let start = startName {
+                    ride.name = start
+                } else {
+                    ride.name = "Giant eBike Ride"
+                }
+                debugLog.log("Recorder", "Ride named: \(ride.name)")
+                try? modelContext?.save()
+            }
+        }
+    }
+
+    /// Reverse-geocode a location into a short place name (street or locality).
+    private func reverseGeocode(geocoder: CLGeocoder, location: CLLocation) async -> String? {
+        do {
+            let placemarks = try await geocoder.reverseGeocodeLocation(location)
+            guard let placemark = placemarks.first else { return nil }
+            // Prefer thoroughfare (street name), fall back to locality
+            return placemark.thoroughfare ?? placemark.locality ?? placemark.subLocality
+        } catch {
+            debugLog.log("Recorder", "Geocode error: \(error.localizedDescription)")
+            return nil
+        }
     }
 }

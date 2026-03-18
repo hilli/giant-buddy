@@ -87,6 +87,15 @@ class WorkoutManager: ObservableObject {
                 } else {
                     self?.debugLog.log("HK", "Workout collection started: \(success)")
                 }
+                // Set brand metadata so Apple Health shows "Giant Buddy"
+                do {
+                    try await builder.addMetadata(
+                        [HKMetadataKeyWorkoutBrandName: "Giant Buddy"]
+                    )
+                    self?.debugLog.log("HK", "Brand metadata set: Giant Buddy")
+                } catch {
+                    self?.debugLog.log("HK", "Brand metadata error: \(error.localizedDescription)")
+                }
             }
         }
     }

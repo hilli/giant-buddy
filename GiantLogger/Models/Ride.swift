@@ -4,6 +4,7 @@ import SwiftData
 @Model
 final class Ride {
     var id: UUID = UUID()
+    var name: String = ""
     var startDate: Date = Date.now
     var endDate: Date?
 

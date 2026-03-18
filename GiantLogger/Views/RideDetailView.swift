@@ -3,13 +3,14 @@ import MapKit
 import Charts
 
 struct RideDetailView: View {
-    let ride: Ride
+    @Bindable var ride: Ride
     @EnvironmentObject var stravaService: StravaService
     @Environment(\.modelContext) private var modelContext
     @State private var exportURL: IdentifiableURL?
     @State private var stravaUploadSuccess = false
     @State private var savedAsRoute = false
     @State private var selectedTimestamp: Date?
+    @State private var isEditingName = false
 
     private var sortedSamples: [RideSample] {
         (ride.samples ?? []).sorted { $0.timestamp < $1.timestamp }
@@ -30,6 +31,9 @@ struct RideDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // Editable ride name
+                rideNameHeader
+
                 // Map with track
                 if !gpsCoordinates.isEmpty {
                     mapSection
@@ -49,7 +53,9 @@ struct RideDetailView: View {
             }
             .padding()
         }
-        .navigationTitle(ride.startDate.formatted(date: .abbreviated, time: .shortened))
+        .navigationTitle(ride.name.isEmpty
+            ? ride.startDate.formatted(date: .abbreviated, time: .shortened)
+            : ride.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -109,6 +115,41 @@ struct RideDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("This ride has been saved to My Routes.")
+        }
+    }
+
+    // MARK: - Ride Name
+
+    private var rideNameHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if isEditingName {
+                TextField("Ride name", text: $ride.name)
+                    .font(.title2.bold())
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { isEditingName = false }
+            } else {
+                HStack {
+                    if ride.name.isEmpty {
+                        Text(ride.startDate.formatted(date: .complete, time: .shortened))
+                            .font(.title2.bold())
+                    } else {
+                        Text(ride.name)
+                            .font(.title2.bold())
+                    }
+                    Spacer()
+                    Button {
+                        isEditingName = true
+                    } label: {
+                        Image(systemName: "pencil.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if !ride.name.isEmpty {
+                    Text(ride.startDate.formatted(date: .complete, time: .shortened))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
