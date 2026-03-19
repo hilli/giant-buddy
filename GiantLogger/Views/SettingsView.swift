@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject var bikeManager: BikeManager
@@ -6,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject var workoutManager: WorkoutManager
     @EnvironmentObject var stravaService: StravaService
     @EnvironmentObject var navigationEngine: NavigationEngine
+    @EnvironmentObject var locationManager: LocationManager
 
     @AppStorage("autoRecord") private var autoRecord = true
     @AppStorage("recordingInterval") private var recordingInterval = 2.0
@@ -47,6 +49,30 @@ struct SettingsView: View {
                     Text("Recording")
                 } footer: {
                     Text("When enabled, rides are saved as Outdoor Cycle workouts in Apple Health.")
+                }
+
+                // Warn if background location isn't granted
+                if autoRecord && !locationManager.hasAlwaysAuthorization {
+                    Section {
+                        HStack(spacing: 12) {
+                            Image(systemName: "location.slash.fill")
+                                .foregroundStyle(.orange)
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Background Location Required")
+                                    .font(.subheadline.bold())
+                                Text("Auto-record needs \"Always\" location access " +
+                                    "to track GPS when the phone is in your pocket.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Button("Open Location Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }
                 }
 
                 Section {

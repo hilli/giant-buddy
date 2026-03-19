@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import os
 
 /// CoreLocation wrapper for GPS tracking during rides.
 @MainActor
@@ -10,6 +11,7 @@ class LocationManager: NSObject, ObservableObject {
     @Published var isTracking = false
 
     private let manager = CLLocationManager()
+    private let debugLog = DebugLogger.shared
 
     override init() {
         super.init()
@@ -23,17 +25,25 @@ class LocationManager: NSObject, ObservableObject {
     }
 
     func requestPermission() {
-        manager.requestWhenInUseAuthorization()
+        manager.requestAlwaysAuthorization()
     }
 
     func requestAlwaysPermission() {
         manager.requestAlwaysAuthorization()
     }
 
+    /// True when the app can receive GPS in the background.
+    var hasAlwaysAuthorization: Bool {
+        authorizationStatus == .authorizedAlways
+    }
+
     func startTracking() {
         guard !isTracking else { return }
         if authorizationStatus == .notDetermined {
             requestPermission()
+        } else if authorizationStatus == .authorizedWhenInUse {
+            // Attempt upgrade to "Always" for background recording
+            manager.requestAlwaysAuthorization()
         }
         manager.startUpdatingLocation()
         isTracking = true
@@ -64,12 +74,29 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
         Task { @MainActor in
-            authorizationStatus = manager.authorizationStatus
+            authorizationStatus = status
+            debugLog.log("Location", "Authorization changed: \(status.debugDescription)")
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("LocationManager: \(error.localizedDescription)")
+        Task { @MainActor in
+            debugLog.log("Location", "Error: \(error.localizedDescription)")
+        }
+    }
+}
+
+extension CLAuthorizationStatus {
+    var debugDescription: String {
+        switch self {
+        case .notDetermined: return "notDetermined"
+        case .restricted: return "restricted"
+        case .denied: return "denied"
+        case .authorizedWhenInUse: return "whenInUse"
+        case .authorizedAlways: return "always"
+        @unknown default: return "unknown(\(rawValue))"
+        }
     }
 }
