@@ -15,7 +15,7 @@ class TrendsViewModel: ObservableObject {
         let totalDuration: Int
         let avgSpeed: Double
         let totalElevation: Double
-        let batteryUsed: Int
+        let batteryUsedWh: Double
         let avgEfficiency: Double
         let longestRide: Double
     }
@@ -64,8 +64,8 @@ class TrendsViewModel: ObservableObject {
         let totalDuration = filtered.reduce(0) { $0 + $1.duration }
         let avgSpeed = filtered.isEmpty ? 0 : filtered.reduce(0.0) { $0 + $1.avgSpeed } / Double(filtered.count)
         let totalElevation = filtered.reduce(0.0) { $0 + $1.elevationGain }
-        let batteryUsed = filtered.reduce(0) { $0 + max(0, $1.startBattery - $1.endBattery) }
-        let avgEfficiency = batteryUsed > 0 ? totalDistance / Double(batteryUsed) : 0
+        let batteryUsedWh = filtered.reduce(0.0) { $0 + Self.rideEnergyWh($1) }
+        let avgEfficiency = batteryUsedWh > 0 ? totalDistance / (batteryUsedWh / 1000.0) : 0
         let longestRide = filtered.map(\.totalDistance).max() ?? 0
 
         return PeriodSummary(
@@ -74,7 +74,7 @@ class TrendsViewModel: ObservableObject {
             totalDuration: totalDuration,
             avgSpeed: avgSpeed,
             totalElevation: totalElevation,
-            batteryUsed: batteryUsed,
+            batteryUsedWh: batteryUsedWh,
             avgEfficiency: avgEfficiency,
             longestRide: longestRide
         )
@@ -110,8 +110,8 @@ class TrendsViewModel: ObservableObject {
             let totalDist = groupRides.reduce(0.0) { $0 + $1.totalDistance }
             let avgSpd = groupRides.reduce(0.0) { $0 + $1.avgSpeed } / Double(groupRides.count)
             let avgPwr = groupRides.reduce(0.0) { $0 + $1.avgPower } / Double(groupRides.count)
-            let battUsed = groupRides.reduce(0) { $0 + max(0, $1.startBattery - $1.endBattery) }
-            let eff = battUsed > 0 ? totalDist / Double(battUsed) : 0
+            let groupWh = groupRides.reduce(0.0) { $0 + Self.rideEnergyWh($1) }
+            let eff = groupWh > 0 ? totalDist / (groupWh / 1000.0) : 0
 
             return DailyAggregate(
                 date: date,
@@ -170,16 +170,17 @@ class TrendsViewModel: ObservableObject {
             ))
         }
 
-        // Best efficiency: highest km per % battery
-        let ridesWithBattery = rides.filter { $0.startBattery - $0.endBattery > 0 }
-        if let bestEfficiency = ridesWithBattery.max(by: {
-            $0.totalDistance / Double(max(1, $0.startBattery - $0.endBattery)) <
-            $1.totalDistance / Double(max(1, $1.startBattery - $1.endBattery))
+        // Best efficiency: highest km per kWh of motor energy
+        let ridesWithEnergy = rides.filter { Self.rideEnergyWh($0) > 0 }
+        if let bestEfficiency = ridesWithEnergy.max(by: {
+            $0.totalDistance / Self.rideEnergyWh($0) <
+            $1.totalDistance / Self.rideEnergyWh($1)
         }) {
-            let eff = bestEfficiency.totalDistance / Double(max(1, bestEfficiency.startBattery - bestEfficiency.endBattery))
+            let whUsed = Self.rideEnergyWh(bestEfficiency)
+            let kmPerKwh = bestEfficiency.totalDistance / (whUsed / 1000.0)
             records.append(PersonalRecord(
                 title: "Best Efficiency",
-                value: String(format: "%.2f km/%%", eff),
+                value: String(format: "%.1f km/kWh", kmPerKwh),
                 date: bestEfficiency.startDate,
                 icon: "leaf"
             ))
@@ -198,5 +199,28 @@ class TrendsViewModel: ObservableObject {
         }
 
         return records
+    }
+
+    // MARK: - Energy Calculation
+
+    /// Compute motor energy used during a ride in watt-hours.
+    /// Integrates motorWatts × sample interval across all samples.
+    static func rideEnergyWh(_ ride: Ride) -> Double {
+        let sorted = (ride.samples ?? [])
+            .filter { $0.motorWatts > 0 }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard sorted.count >= 2 else {
+            // Fallback: avgPower × duration
+            return ride.avgPower * Double(ride.duration) / 3600.0
+        }
+        var totalWs = 0.0
+        for idx in 1..<sorted.count {
+            let deltaSeconds = sorted[idx].timestamp
+                .timeIntervalSince(sorted[idx - 1].timestamp)
+            guard deltaSeconds > 0, deltaSeconds < 60 else { continue }
+            let avgWatts = (sorted[idx].motorWatts + sorted[idx - 1].motorWatts) / 2.0
+            totalWs += avgWatts * deltaSeconds
+        }
+        return totalWs / 3600.0
     }
 }

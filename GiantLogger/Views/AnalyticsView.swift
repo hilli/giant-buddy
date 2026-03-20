@@ -68,8 +68,8 @@ struct AnalyticsView: View {
                     StatCard(title: "Total Duration", value: formatDuration(summary.totalDuration), icon: "timer")
                     StatCard(title: "Avg Speed", value: String(format: "%.1f km/h", summary.avgSpeed), icon: "speedometer")
                     StatCard(title: "Total Elevation", value: formatElevation(summary.totalElevation), icon: "mountain.2")
-                    StatCard(title: "Battery Used", value: "\(summary.batteryUsed)%", icon: "battery.75")
-                    StatCard(title: "Avg Efficiency", value: summary.avgEfficiency > 0 ? String(format: "%.2f km/%%", summary.avgEfficiency) : "—", icon: "leaf")
+                    StatCard(title: "Energy Used", value: String(format: "%.0f Wh", summary.batteryUsedWh), icon: "battery.75")
+                    StatCard(title: "Avg Efficiency", value: summary.avgEfficiency > 0 ? String(format: "%.1f km/kWh", summary.avgEfficiency) : "—", icon: "leaf")
                     StatCard(title: "Longest Ride", value: String(format: "%.1f km", summary.longestRide), icon: "trophy")
                 }
             }
