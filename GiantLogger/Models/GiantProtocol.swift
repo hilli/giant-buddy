@@ -274,15 +274,14 @@ enum GiantProtocol {
 
     static func parseDiagnosticSyncDrive(_ plain: [UInt8]) -> SyncDriveData? {
         guard plain[0] == Command.diagnosticSyncDrive.rawValue else { return nil }
-        // Android: bArrI = d.i(2, 16, decrypted) → indices map to plain[2..15]
         // bArrI[0]=ecode, [1:2]=speed/10, [3:4]=torque/10, [5:6]=cadence/10,
-        // [7:8]=acur/10, [9]=rsoce, [10]=light (bits 4-5: mask 0x30 >> 4)
+        // [7:8]=acur (milliamps, /1000 → A), [9]=rsoce, [10]=light (bits 4-5: mask 0x30 >> 4)
         return SyncDriveData(
             errorCode: Int(plain[2]),
             speed: Double(littleEndianUInt16(plain, offset: 3)) / 10.0,
             torque: Double(littleEndianUInt16(plain, offset: 5)) / 10.0,
             cadence: Double(littleEndianUInt16(plain, offset: 7)) / 10.0,
-            assistCurrent: Double(littleEndianUInt16(plain, offset: 9)) / 10.0,
+            assistCurrent: Double(littleEndianUInt16(plain, offset: 9)) / 1000.0,
             rsoc: Int(plain[11]),
             lightMode: Int((plain[12] & 0x30) >> 4)
         )
