@@ -383,6 +383,8 @@ extension RideRecorder {
 
     /// Resolve a human-readable ride name from start/end GPS coordinates.
     /// Falls back to "Giant eBike Ride" on failure or missing data.
+    /// Uses a background task to ensure geocoding completes even when
+    /// the app is suspended (e.g. phone in pocket).
     func resolveRideName(for ride: Ride, samples: [RideSample]) {
         let gpsSamples = samples.filter { $0.latitude != 0 || $0.longitude != 0 }
         guard let first = gpsSamples.first, let last = gpsSamples.last else {
@@ -391,9 +393,20 @@ extension RideRecorder {
             return
         }
 
+        // Set fallback immediately so the ride is never unnamed
+        ride.name = "Giant eBike Ride"
+        try? modelContext?.save()
+
         let startLoc = CLLocation(latitude: first.latitude, longitude: first.longitude)
         let endLoc = CLLocation(latitude: last.latitude, longitude: last.longitude)
         let geocoder = CLGeocoder()
+
+        // Request background execution time for the network call
+        var bgTaskID = UIBackgroundTaskIdentifier.invalid
+        bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "geocode-ride") {
+            UIApplication.shared.endBackgroundTask(bgTaskID)
+            bgTaskID = .invalid
+        }
 
         Task {
             let startName = await reverseGeocode(geocoder: geocoder, location: startLoc)
@@ -404,11 +417,13 @@ extension RideRecorder {
                     ride.name = "\(start) → \(end)"
                 } else if let start = startName {
                     ride.name = start
-                } else {
-                    ride.name = "Giant eBike Ride"
                 }
                 debugLog.log("Recorder", "Ride named: \(ride.name)")
                 try? modelContext?.save()
+
+                if bgTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTaskID)
+                }
             }
         }
     }
