@@ -60,7 +60,7 @@ Navigation
 
 ## Privacy URL
 
-<!-- Add your privacy policy URL here -->
+https://github.com/hilli/giant-logger-ios/blob/main/PRIVACY.md
 
 ## Support URL
 
