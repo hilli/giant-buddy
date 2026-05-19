@@ -194,8 +194,9 @@ struct GiantLoggerApp: App {
                 .environmentObject(favoritePlacesManager)
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
-                        bikeManager.attemptAutoReconnect()
+                        bikeManager.startForegroundAutoReconnectLoop()
                     } else if newPhase == .background {
+                        bikeManager.stopForegroundAutoReconnectLoop()
                         bikeManager.ensurePendingConnect()
                     }
                 }

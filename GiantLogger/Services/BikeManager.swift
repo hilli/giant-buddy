@@ -37,6 +37,8 @@ class BikeManager: NSObject, ObservableObject {
     // Auto-connect settings
     @Published var autoConnectIdentifier: UUID?
     private var connectTimeoutTask: Task<Void, Never>?
+    private var foregroundReconnectTask: Task<Void, Never>?
+    private var userInitiatedDisconnect = false
 
     override init() {
         super.init()
@@ -57,6 +59,7 @@ class BikeManager: NSObject, ObservableObject {
             debugLog.log("BLE", "Cannot scan: bluetooth state=\(centralManager.state.rawValue)")
             return
         }
+        userInitiatedDisconnect = false
         logger.info("Starting scan for GEV service")
         debugLog.log("BLE", "Starting scan for GEV service")
         discoveredDevices.removeAll()
@@ -90,6 +93,8 @@ class BikeManager: NSObject, ObservableObject {
     func attemptAutoReconnect() {
         guard centralManager.state == .poweredOn,
               let savedID = autoConnectIdentifier else { return }
+
+        userInitiatedDisconnect = false
 
         // If already connected or discovering services, nothing to do
         if connectionState == .connected || connectionState == .discoveringServices { return }
@@ -161,6 +166,8 @@ class BikeManager: NSObject, ObservableObject {
               let savedID = autoConnectIdentifier else { return }
         if connectionState == .connected || connectionState == .discoveringServices { return }
 
+        userInitiatedDisconnect = false
+
         let peripherals = centralManager.retrievePeripherals(withIdentifiers: [savedID])
         guard let peripheral = peripherals.first else {
             debugLog.log("BLE", "ensurePendingConnect: no cached peripheral for \(savedID)")
@@ -177,6 +184,7 @@ class BikeManager: NSObject, ObservableObject {
     func connect(to peripheral: CBPeripheral) {
         logger.info("Connecting to peripheral \(peripheral.identifier.uuidString, privacy: .public)")
         debugLog.log("BLE", "Connecting to \(peripheral.identifier.uuidString)")
+        userInitiatedDisconnect = false
         connectTimeoutTask?.cancel()
         // Cancel any stale pending connect for a different peripheral object
         if let pending = connectedPeripheral, pending !== peripheral,
@@ -191,12 +199,42 @@ class BikeManager: NSObject, ObservableObject {
         centralManager.connect(peripheral, options: nil)
     }
 
-    func disconnect() {
+    func disconnect(userInitiated: Bool = true) {
         logger.info("Disconnect requested")
+        userInitiatedDisconnect = userInitiated
+        if userInitiated {
+            stopForegroundAutoReconnectLoop()
+        }
         if let peripheral = connectedPeripheral {
             centralManager.cancelPeripheralConnection(peripheral)
         }
         cleanup()
+    }
+
+    func startForegroundAutoReconnectLoop() {
+        guard foregroundReconnectTask == nil else { return }
+        attemptAutoReconnect()
+
+        foregroundReconnectTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { break }
+                guard let self else { break }
+                guard UIApplication.shared.applicationState == .active else { continue }
+                guard self.autoConnectIdentifier != nil else { break }
+                if self.connectionState == .connected || self.connectionState == .discoveringServices {
+                    break
+                }
+                self.debugLog.log("BLE", "Foreground auto-reconnect retry")
+                self.attemptAutoReconnect()
+            }
+            self?.foregroundReconnectTask = nil
+        }
+    }
+
+    func stopForegroundAutoReconnectLoop() {
+        foregroundReconnectTask?.cancel()
+        foregroundReconnectTask = nil
     }
 
     func write(_ data: Data) {
@@ -260,7 +298,11 @@ extension BikeManager: CBCentralManagerDelegate {
             logger.info("Central state updated: \(central.state.rawValue)")
             debugLog.log("BLE", "Central state: \(central.state.rawValue)")
             if central.state == .poweredOn {
-                attemptAutoReconnect()
+                if UIApplication.shared.applicationState == .active {
+                    startForegroundAutoReconnectLoop()
+                } else {
+                    attemptAutoReconnect()
+                }
             }
         }
     }
@@ -326,13 +368,26 @@ extension BikeManager: CBCentralManagerDelegate {
                 logger.info("Disconnected from peripheral")
                 debugLog.log("BLE", "Disconnected from peripheral")
             }
-            let wasUnexpected = error != nil
+            let shouldReconnect = !userInitiatedDisconnect && autoConnectIdentifier != nil
+            userInitiatedDisconnect = false
             cleanup()
-            // Auto-reconnect on unexpected disconnection
-            if wasUnexpected, autoConnectIdentifier != nil {
-                debugLog.log("BLE", "Unexpected disconnect — will retry in 2s")
-                try? await Task.sleep(for: .seconds(2))
-                attemptAutoReconnect()
+            // Auto-reconnect unless the user explicitly disconnected.
+            if shouldReconnect {
+                let bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "ble-reconnect") {
+                    Task { @MainActor in
+                        self.debugLog.log("BLE", "WARN: background task expired before reconnect retry")
+                    }
+                }
+                debugLog.log("BLE", "Bike disconnected — will retry auto-reconnect")
+                if UIApplication.shared.applicationState == .active {
+                    try? await Task.sleep(for: .seconds(2))
+                    startForegroundAutoReconnectLoop()
+                } else {
+                    attemptAutoReconnect()
+                }
+                if bgTaskID != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTaskID)
+                }
             }
         }
     }
@@ -341,7 +396,18 @@ extension BikeManager: CBCentralManagerDelegate {
         Task { @MainActor in
             logger.error("Failed to connect: \(error?.localizedDescription ?? "unknown", privacy: .public)")
             debugLog.log("BLE", "ERROR: Failed to connect: \(error?.localizedDescription ?? "unknown")")
+            let shouldReconnect = !userInitiatedDisconnect && autoConnectIdentifier != nil
+            userInitiatedDisconnect = false
             cleanup()
+            if shouldReconnect {
+                debugLog.log("BLE", "Connect failed — retrying auto-reconnect")
+                if UIApplication.shared.applicationState == .active {
+                    try? await Task.sleep(for: .seconds(2))
+                    startForegroundAutoReconnectLoop()
+                } else {
+                    attemptAutoReconnect()
+                }
+            }
         }
     }
 }
@@ -358,7 +424,7 @@ extension BikeManager: CBPeripheralDelegate {
             guard let service = peripheral.services?.first(where: { $0.uuid == serviceUUID }) else {
                 logger.error("GEV service not found on connected peripheral")
                 debugLog.log("BLE", "ERROR: GEV service not found")
-                disconnect()
+                disconnect(userInitiated: false)
                 return
             }
             logger.debug("GEV service discovered, reading characteristics")

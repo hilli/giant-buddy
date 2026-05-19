@@ -139,6 +139,17 @@ class RideRecorder: ObservableObject {
     }
 
     func stopRecording() {
+        let bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "stop-recording") {
+            Task { @MainActor in
+                self.debugLog.log("Recorder", "WARN: background task expired while stopping recording")
+            }
+        }
+        defer {
+            if bgTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTaskID)
+            }
+        }
+
         recordingTask?.cancel()
         recordingTask = nil
         durationTask?.cancel()

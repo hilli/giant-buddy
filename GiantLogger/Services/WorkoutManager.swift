@@ -2,6 +2,29 @@ import Foundation
 import HealthKit
 import CoreLocation
 import os
+import UIKit
+
+@MainActor
+private final class BackgroundTaskHandle {
+    private var identifier: UIBackgroundTaskIdentifier = .invalid
+    private let debugLog: DebugLogger
+
+    init(name: String, debugLog: DebugLogger) {
+        self.debugLog = debugLog
+        identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+            Task { @MainActor in
+                self?.debugLog.log("HK", "WARN: background task expired while saving workout")
+                self?.end()
+            }
+        }
+    }
+
+    func end() {
+        guard identifier != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(identifier)
+        identifier = .invalid
+    }
+}
 
 /// Manages HealthKit workout lifecycle for outdoor cycling activities.
 @MainActor
@@ -150,6 +173,7 @@ class WorkoutManager: ObservableObject {
         let endDate = Date()
         let startDate = workoutStartDate ?? endDate.addingTimeInterval(-duration)
         let capturedRouteBuilder = routeBuilder
+        let backgroundTask = BackgroundTaskHandle(name: "save-workout", debugLog: debugLog)
 
         // Clear references immediately
         workoutBuilder = nil
@@ -241,29 +265,29 @@ class WorkoutManager: ObservableObject {
                 Task { @MainActor in
                     if let error {
                         self?.debugLog.log("HK", "Finish workout FAILED: \(error.localizedDescription)")
+                        backgroundTask.end()
                         return
                     }
                     guard let workout else {
                         self?.debugLog.log("HK", "Finish workout returned nil")
+                        backgroundTask.end()
                         return
                     }
                     self?.debugLog.log("HK", "Workout saved ✅ duration=\(Int(workout.duration))s")
 
                     // Step 4: Attach GPS route
-                    if let capturedRouteBuilder {
-                        Task {
-                            do {
-                                try await capturedRouteBuilder.finishRoute(with: workout, metadata: nil)
-                                await MainActor.run {
-                                    self?.debugLog.log("HK", "Route saved ✅")
-                                }
-                            } catch {
-                                await MainActor.run {
-                                    self?.debugLog.log("HK", "Route save error: \(error.localizedDescription)")
-                                }
-                            }
-                        }
+                    guard let capturedRouteBuilder else {
+                        backgroundTask.end()
+                        return
                     }
+
+                    do {
+                        try await capturedRouteBuilder.finishRoute(with: workout, metadata: nil)
+                        self?.debugLog.log("HK", "Route saved ✅")
+                    } catch {
+                        self?.debugLog.log("HK", "Route save error: \(error.localizedDescription)")
+                    }
+                    backgroundTask.end()
                 }
             }
         }
