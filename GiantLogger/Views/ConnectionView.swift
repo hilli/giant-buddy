@@ -3,6 +3,7 @@ import SwiftUI
 struct ConnectionView: View {
     @EnvironmentObject var bikeManager: BikeManager
     @EnvironmentObject var bikeService: GiantBikeService
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
@@ -33,6 +34,19 @@ struct ConnectionView: View {
                 scanSection
             }
             .navigationTitle("Bike")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gear")
+                    }
+                    .accessibilityLabel("Settings")
+                }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
             .refreshable {
                 bikeService.fetchAllBikeData()
                 try? await Task.sleep(for: .seconds(7))

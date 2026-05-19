@@ -46,13 +46,8 @@ struct ContentView: View {
                 .tabItem {
                     Label("Bike", systemImage: "bicycle")
                 }
-
-            SettingsView()
-                .tag(5)
-                .tabItem {
-                    Label("Settings", systemImage: "gear")
-                }
         }
+        .minimizeTabBarOnScrollDownIfAvailable()
         .fullScreenCover(isPresented: $crashDetector.isCrashDetected) {
             CrashAlertView(crashDetector: crashDetector, location: locationManager.currentLocation)
         }
@@ -92,7 +87,7 @@ struct ContentView: View {
             showGPXImportAlert = true
         }
         .alert("GPX Import", isPresented: $showGPXImportAlert) {
-            Button("OK", role: .cancel) { }
+            Button("OK", role: .cancel) {}
         } message: {
             Text(gpxImportMessage ?? "")
         }
@@ -103,4 +98,15 @@ extension Notification.Name {
     static let switchToRideTab = Notification.Name("switchToRideTab")
     static let switchToHistoryTab = Notification.Name("switchToHistoryTab")
     static let gpxImportResult = Notification.Name("gpxImportResult")
+}
+
+private extension View {
+    @ViewBuilder
+    func minimizeTabBarOnScrollDownIfAvailable() -> some View {
+        if #available(iOS 26.0, *) {
+            tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            self
+        }
+    }
 }
