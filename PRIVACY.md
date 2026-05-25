@@ -4,7 +4,7 @@
 
 Giant Buddy is an open-source iOS app for Giant e-bikes with RideControl+ BLE connectivity. This privacy policy explains what data the app collects, how it is used, and your choices.
 
-Source code: [github.com/hilli/giant-logger-ios](https://github.com/hilli/giant-logger-ios)
+Source code: [github.com/hilli/giant-buddy](https://github.com/hilli/giant-buddy)
 
 ## Data We Collect
 
@@ -65,8 +65,8 @@ Giant Buddy is not directed at children under 13 and does not knowingly collect 
 
 ## Changes to This Policy
 
-Updates will be posted to this file in the [source repository](https://github.com/hilli/giant-logger-ios/blob/main/PRIVACY.md). The "Last updated" date at the top will be revised accordingly.
+Updates will be posted to this file in the [source repository](https://github.com/hilli/giant-buddy/blob/main/PRIVACY.md). The "Last updated" date at the top will be revised accordingly.
 
 ## Contact
 
-For questions about this privacy policy, open an issue at [github.com/hilli/giant-logger-ios/issues](https://github.com/hilli/giant-logger-ios/issues).
+For questions about this privacy policy, open an issue at [github.com/hilli/giant-buddy/issues](https://github.com/hilli/giant-buddy/issues).

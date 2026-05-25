@@ -134,7 +134,7 @@ struct SettingsView: View {
                         Text("Jens Hilligsøe")
                             .foregroundStyle(.secondary)
                     }
-                    Link(destination: URL(string: "https://github.com/hilli/giant-logger-ios")!) {
+                    Link(destination: URL(string: "https://github.com/hilli/giant-buddy")!) {
                         HStack {
                             Text("Source Code")
                             Spacer()

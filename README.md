@@ -42,6 +42,7 @@ It is the iOS/watchOS evolution of [giant-esp32](https://github.com/hilli/giant-
 
 - Record GPS and bike telemetry in the background
 - Auto-record on connect: recording starts when the bike pairs, even from a background launch; a local notification confirms it began
+- Auto-name rides from the start/end GPS addresses (e.g. "Aarhus → Skanderborg")
 - Store rides locally with SwiftData
 - Browse ride history with summary cards and route maps
 - Inspect ride details with interactive charts for speed, motor power, rider power, elevation, and battery
@@ -49,7 +50,7 @@ It is the iOS/watchOS evolution of [giant-esp32](https://github.com/hilli/giant-
 - Save a recorded ride as a reusable route
 - Export rides as CSV or GPX
 - Upload rides to Strava
-- View analytics across week, month, year, or all-time periods
+- View analytics across week, month, year, or all-time periods, including energy used in Wh
 
 ### Bike Info, Maintenance, and Battery Health
 
