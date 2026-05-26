@@ -1,0 +1,4 @@
+baseline: .swiftlint-baseline.json
+
+excluded:
+  - build
