@@ -41,7 +41,7 @@ class WatchSessionManager: NSObject, ObservableObject {
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
     private var telemetryTimeoutTask: Task<Void, Never>?
-    private var pendingHeartRateSamples: [[String: Any]] = []
+    private var pendingHeartRateSamples: [HeartRatePayload] = []
     private var healthKitAuthorizationRequested = false
     private var lastHapticID: String?
     private let maxPendingHeartRateSamples = 300
@@ -76,7 +76,7 @@ class WatchSessionManager: NSObject, ObservableObject {
 
     // MARK: - HealthKit Workout
 
-    func requestHealthKitAuth(completion: ((Bool) -> Void)? = nil) {
+    func requestHealthKitAuth(completion: (@MainActor @Sendable (Bool) -> Void)? = nil) {
         guard HKHealthStore.isHealthDataAvailable() else {
             completion?(false)
             return
@@ -93,7 +93,9 @@ class WatchSessionManager: NSObject, ObservableObject {
             } else {
                 print("WatchHK: auth result: \(success)")
             }
-            completion?(success)
+            Task { @MainActor in
+                completion?(success)
+            }
         }
     }
 
@@ -175,17 +177,17 @@ class WatchSessionManager: NSObject, ObservableObject {
     }
 
     // swiftlint:disable:next cyclomatic_complexity
-    private func updateFromContext(_ context: [String: Any]) {
-        if let val = context["speed"] as? Double { speed = val }
-        if let val = context["battery"] as? Int {
+    private func updateFromPayload(_ payload: WatchPayload) {
+        if let val = payload.speed { speed = val }
+        if let val = payload.battery {
             battery = val
-            persistForComplications(battery: val, range: context["estimatedRange"] as? Int)
+            persistForComplications(battery: val, range: payload.estimatedRange)
         }
-        if let val = context["distance"] as? Double { distance = val }
-        if let val = context["duration"] as? Int { duration = val }
-        if let val = context["cadence"] as? Double { cadence = val }
-        if let val = context["watts"] as? Double { watts = val }
-        if let val = context["isRecording"] as? Bool {
+        if let val = payload.distance { distance = val }
+        if let val = payload.duration { duration = val }
+        if let val = payload.cadence { cadence = val }
+        if let val = payload.watts { watts = val }
+        if let val = payload.isRecording {
             let wasRecording = isRecording
             isRecording = val
             if val && !wasRecording {
@@ -197,15 +199,15 @@ class WatchSessionManager: NSObject, ObservableObject {
                 handleRecordingStop()
             }
         }
-        if let val = context["bikeName"] as? String { bikeName = val }
-        if let val = context["estimatedRange"] as? Int { estimatedRange = val }
-        if let val = context["totalOdometer"] as? Double { totalOdometer = val }
-        if let val = context["totalUsageHours"] as? Int { totalUsageHours = val }
-        if let val = context["isNavigating"] as? Bool { isNavigating = val }
-        if let val = context["navInstruction"] as? String { navInstruction = val }
-        if let val = context["navDistance"] as? Double { navDistance = val }
-        if let val = context["navSymbol"] as? String { navSymbol = val }
-        navStreet = context["navStreet"] as? String
+        if let val = payload.bikeName { bikeName = val }
+        if let val = payload.estimatedRange { estimatedRange = val }
+        if let val = payload.totalOdometer { totalOdometer = val }
+        if let val = payload.totalUsageHours { totalUsageHours = val }
+        if let val = payload.isNavigating { isNavigating = val }
+        if let val = payload.navInstruction { navInstruction = val }
+        if let val = payload.navDistance { navDistance = val }
+        if let val = payload.navSymbol { navSymbol = val }
+        navStreet = payload.navStreet
     }
 
     private func persistForComplications(battery: Int, range: Int?) {
@@ -228,34 +230,37 @@ extension WatchSessionManager: WCSessionDelegate {
         if let error {
             print("WatchSession: activation failed: \(error)")
         }
-        print("WatchSession: activated state=\(state.rawValue) reachable=\(session.isReachable)")
+        let isReachable = session.isReachable
+        let context = session.receivedApplicationContext
+        let payload = WatchPayload(context)
+        print("WatchSession: activated state=\(state.rawValue) reachable=\(isReachable)")
+        print("WatchSession: cached context has \(context.count) keys: \(Array(context.keys))")
         Task { @MainActor in
-            isPhoneReachable = session.isReachable
+            isPhoneReachable = isReachable
             // Load last received context so Watch has data immediately
-            let context = session.receivedApplicationContext
-            print("WatchSession: cached context has \(context.count) keys: \(Array(context.keys))")
-            if !context.isEmpty {
-                updateFromContext(context)
+            if !payload.isEmpty {
+                updateFromPayload(payload)
             }
         }
     }
 
     nonisolated func session(_: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         let battery = applicationContext["battery"] ?? "nil"
+        let payload = WatchPayload(applicationContext)
         print("WatchSession: received context with \(applicationContext.count) keys - battery=\(battery)")
         Task { @MainActor in
-            updateFromContext(applicationContext)
+            updateFromPayload(payload)
         }
     }
 
     nonisolated func session(_: WCSession, didReceiveMessage message: [String: Any]) {
+        let payload = WatchPayload(message)
         Task { @MainActor in
-            let messageType = message["type"] as? String
+            let messageType = payload.messageType
             if messageType == "navigation" || messageType == "telemetry" {
-                updateFromContext(message)
-                if messageType == "navigation", let hapticType = message["hapticType"] as? String {
-                    guard let hapticID = message["hapticID"] as? String,
-                          hapticID != lastHapticID else { return }
+                updateFromPayload(payload)
+                if messageType == "navigation", let hapticType = payload.hapticType {
+                    guard let hapticID = payload.hapticID, hapticID != lastHapticID else { return }
                     lastHapticID = hapticID
                     switch hapticType {
                     case "turn":
@@ -269,7 +274,7 @@ extension WatchSessionManager: WCSessionDelegate {
                         break
                     }
                 }
-            } else if message["type"] as? String == "recordingStop" {
+            } else if messageType == "recordingStop" {
                 print("WatchSession: received recordingStop message")
                 handleRecordingStop()
             }
@@ -277,9 +282,10 @@ extension WatchSessionManager: WCSessionDelegate {
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
+        let isReachable = session.isReachable
         Task { @MainActor in
-            isPhoneReachable = session.isReachable
-            if session.isReachable {
+            isPhoneReachable = isReachable
+            if isReachable {
                 flushPendingHeartRateSamples()
             }
         }
@@ -313,38 +319,47 @@ extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
         _ workoutBuilder: HKLiveWorkoutBuilder,
         didCollectDataOf collectedTypes: Set<HKSampleType>
     ) {
+        var collectedBPM: Double?
+        var collectedCalories: Double?
+        for type in collectedTypes {
+            guard let quantityType = type as? HKQuantityType else { continue }
+
+            if quantityType == HKQuantityType(.heartRate),
+               let stats = workoutBuilder.statistics(for: quantityType),
+               let bpm = stats.mostRecentQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())),
+               bpm > 0 {
+                collectedBPM = bpm
+            }
+
+            if quantityType == HKQuantityType(.activeEnergyBurned),
+               let stats = workoutBuilder.statistics(for: quantityType),
+               let cal = stats.sumQuantity()?.doubleValue(for: .kilocalorie()) {
+                collectedCalories = cal
+            }
+        }
+
         Task { @MainActor in
-            for type in collectedTypes {
-                guard let quantityType = type as? HKQuantityType else { continue }
+            if let collectedBPM {
+                heartRate = collectedBPM
+                sendHeartRate(collectedBPM)
+            }
 
-                if quantityType == HKQuantityType(.heartRate),
-                   let stats = workoutBuilder.statistics(for: quantityType),
-                   let bpm = stats.mostRecentQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())),
-                   bpm > 0 {
-                    heartRate = bpm
-                    sendHeartRate(bpm)
-                }
-
-                if quantityType == HKQuantityType(.activeEnergyBurned),
-                   let stats = workoutBuilder.statistics(for: quantityType),
-                   let cal = stats.sumQuantity()?.doubleValue(for: .kilocalorie()) {
-                    activeCalories = cal
-                }
+            if let collectedCalories {
+                activeCalories = collectedCalories
             }
         }
     }
 
     private func sendHeartRate(_ bpm: Double) {
-        let payload: [String: Any] = [
-            "type": "heartRate",
-            "heartRate": bpm,
-            "activeCalories": activeCalories,
-            "timestamp": Date().timeIntervalSince1970
-        ]
+        let payload = HeartRatePayload(
+            bpm: bpm,
+            activeCalories: activeCalories,
+            timestamp: Date().timeIntervalSince1970
+        )
 
         guard let session else { return }
         if session.isReachable {
-            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+            session.sendMessage(payload.dictionary, replyHandler: nil) { [weak self] error in
                 print("WatchSession: HR message failed: \(error.localizedDescription)")
                 Task { @MainActor in
                     self?.queueHeartRateSample(payload)
@@ -352,11 +367,11 @@ extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
             }
         } else {
             queueHeartRateSample(payload)
-            session.transferUserInfo(payload)
+            session.transferUserInfo(payload.dictionary)
         }
     }
 
-    private func queueHeartRateSample(_ payload: [String: Any]) {
+    private func queueHeartRateSample(_ payload: HeartRatePayload) {
         pendingHeartRateSamples.append(payload)
         if pendingHeartRateSamples.count > maxPendingHeartRateSamples {
             pendingHeartRateSamples.removeFirst(pendingHeartRateSamples.count - maxPendingHeartRateSamples)
@@ -369,7 +384,7 @@ extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
         pendingHeartRateSamples.removeAll()
         session.sendMessage([
             "type": "heartRateBatch",
-            "samples": samples
+            "samples": samples.map(\.dictionary)
         ], replyHandler: nil) { [weak self] error in
             print("WatchSession: HR batch failed: \(error.localizedDescription)")
             Task { @MainActor in

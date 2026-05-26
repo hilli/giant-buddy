@@ -3,7 +3,7 @@ import Foundation
 /// Simple file-based debug logger for BLE/GEV diagnostics.
 /// Writes timestamped lines to a `.log` file in the app's documents directory
 /// so logs can be captured on-device and exported later.
-final class DebugLogger {
+final class DebugLogger: @unchecked Sendable {
     static let shared = DebugLogger()
 
     private let fileURL: URL
@@ -30,9 +30,10 @@ final class DebugLogger {
     /// Append a timestamped log line (no-op when disabled).
     func log(_ category: String, _ message: String) {
         guard isEnabled else { return }
-        let timestamp = dateFormatter.string(from: Date())
-        let line = "[\(timestamp)] [\(category)] \(message)\n"
-        queue.async { [fileURL] in
+        let date = Date()
+        queue.async { [self] in
+            let timestamp = dateFormatter.string(from: date)
+            let line = "[\(timestamp)] [\(category)] \(message)\n"
             if let data = line.data(using: .utf8) {
                 if FileManager.default.fileExists(atPath: fileURL.path) {
                     if let handle = try? FileHandle(forWritingTo: fileURL) {

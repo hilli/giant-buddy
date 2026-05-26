@@ -1,8 +1,10 @@
 import Foundation
-import CoreBluetooth
+@preconcurrency import CoreBluetooth
 import Combine
 import OSLog
 import UIKit
+
+// swiftlint:disable file_length
 
 /// Manages BLE scanning, connection, and characteristic I/O for the Giant GEV service.
 @MainActor
@@ -276,19 +278,17 @@ class BikeManager: NSObject, ObservableObject {
 
 // MARK: - CBCentralManagerDelegate
 
-extension BikeManager: CBCentralManagerDelegate {
-    nonisolated func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
-        Task { @MainActor in
-            debugLog.log("BLE", "State restoration triggered")
-            if let peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral],
-               let peripheral = peripherals.first {
-                connectedPeripheral = peripheral
-                peripheral.delegate = self
-                connectedPeripheralName = peripheral.name?.trimmingCharacters(in: .whitespaces)
-                if peripheral.state == .connected {
-                    connectionState = .discoveringServices
-                    peripheral.discoverServices([serviceUUID])
-                }
+extension BikeManager: @MainActor CBCentralManagerDelegate {
+    func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        debugLog.log("BLE", "State restoration triggered")
+        if let peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral],
+           let peripheral = peripherals.first {
+            connectedPeripheral = peripheral
+            peripheral.delegate = self
+            connectedPeripheralName = peripheral.name?.trimmingCharacters(in: .whitespaces)
+            if peripheral.state == .connected {
+                connectionState = .discoveringServices
+                peripheral.discoverServices([serviceUUID])
             }
         }
     }
@@ -308,12 +308,17 @@ extension BikeManager: CBCentralManagerDelegate {
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
+        let rssiValue = RSSI.intValue
         Task { @MainActor in
-            let name = peripheral.name ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "Unknown"
-            logger.debug("Discovered \(name, privacy: .public) \(peripheral.identifier.uuidString, privacy: .public) RSSI=\(RSSI.intValue)")
-            debugLog.log("BLE", "Discovered \(name) \(peripheral.identifier.uuidString) RSSI=\(RSSI.intValue)")
+            let name = peripheral.name ?? advertisedName ?? "Unknown"
+            let identifier = peripheral.identifier.uuidString
+            logger.debug(
+                "Discovered \(name, privacy: .public) \(identifier, privacy: .public) RSSI=\(rssiValue)"
+            )
+            debugLog.log("BLE", "Discovered \(name) \(identifier) RSSI=\(rssiValue)")
             if !discoveredDevices.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
-                discoveredDevices.append((peripheral: peripheral, name: name, rssi: RSSI.intValue))
+                discoveredDevices.append((peripheral: peripheral, name: name, rssi: rssiValue))
             }
             // Auto-connect if matching saved identifier
             if let autoID = autoConnectIdentifier, peripheral.identifier == autoID {

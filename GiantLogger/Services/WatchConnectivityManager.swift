@@ -1,9 +1,23 @@
 import WatchConnectivity
 import Combine
 
-struct WatchHeartRateSample {
+struct WatchHeartRateSample: Sendable {
     let timestamp: Date
     let bpm: Double
+}
+
+private struct WatchHeartRateUpdate: Sendable {
+    let timestamp: Date
+    let bpm: Double
+    let activeCalories: Double?
+
+    init?(_ payload: [String: Any]) {
+        guard let bpm = payload["heartRate"] as? Double, bpm > 0 else { return nil }
+        let timestamp = payload["timestamp"] as? Double ?? Date().timeIntervalSince1970
+        self.timestamp = Date(timeIntervalSince1970: timestamp)
+        self.bpm = bpm
+        activeCalories = payload["activeCalories"] as? Double
+    }
 }
 
 /// Manages WatchConnectivity on the iPhone side, sending telemetry
@@ -189,14 +203,11 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         }
     }
 
-    private func applyHeartRatePayload(_ payload: [String: Any]) {
-        if let bpm = payload["heartRate"] as? Double, bpm > 0 {
-            heartRate = bpm
-            let timestamp = payload["timestamp"] as? Double ?? Date().timeIntervalSince1970
-            appendHeartRateSample(timestamp: Date(timeIntervalSince1970: timestamp), bpm: bpm)
-        }
-        if let cal = payload["activeCalories"] as? Double {
-            activeCalories = cal
+    private func applyHeartRateUpdate(_ update: WatchHeartRateUpdate) {
+        heartRate = update.bpm
+        appendHeartRateSample(timestamp: update.timestamp, bpm: update.bpm)
+        if let calories = update.activeCalories {
+            activeCalories = calories
         }
     }
 
@@ -224,7 +235,6 @@ extension WatchConnectivityManager: WCSessionDelegate {
         }
         if state == .activated {
             Task { @MainActor in
-                self.latestContext = session.applicationContext
                 self.pushBikeDataForComplications()
             }
         }
@@ -236,26 +246,31 @@ extension WatchConnectivityManager: WCSessionDelegate {
     }
 
     nonisolated func session(_: WCSession, didReceiveMessage message: [String: Any]) {
+        let command = message["command"] as? String
+        let messageType = message["type"] as? String
+        let heartRateUpdate = WatchHeartRateUpdate(message)
+        let heartRateBatch = (message["samples"] as? [[String: Any]])?.compactMap(WatchHeartRateUpdate.init)
         Task { @MainActor in
-            if let command = message["command"] as? String {
+            if let command {
                 switch command {
                 case "startRecording": onStartRecording?()
                 case "stopRecording": onStopRecording?()
                 default: break
                 }
-            } else if let type = message["type"] as? String, type == "heartRate" {
-                self.applyHeartRatePayload(message)
-            } else if let type = message["type"] as? String, type == "heartRateBatch",
-                      let samples = message["samples"] as? [[String: Any]] {
-                samples.forEach { self.applyHeartRatePayload($0) }
+            } else if messageType == "heartRate", let heartRateUpdate {
+                self.applyHeartRateUpdate(heartRateUpdate)
+            } else if messageType == "heartRateBatch", let heartRateBatch {
+                heartRateBatch.forEach { self.applyHeartRateUpdate($0) }
             }
         }
     }
 
     nonisolated func session(_: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        let messageType = userInfo["type"] as? String
+        let heartRateUpdate = WatchHeartRateUpdate(userInfo)
         Task { @MainActor in
-            if userInfo["type"] as? String == "heartRate" {
-                self.applyHeartRatePayload(userInfo)
+            if messageType == "heartRate", let heartRateUpdate {
+                self.applyHeartRateUpdate(heartRateUpdate)
             }
         }
     }

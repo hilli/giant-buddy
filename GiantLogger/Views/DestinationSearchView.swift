@@ -1,6 +1,8 @@
 import SwiftUI
-import MapKit
+@preconcurrency import MapKit
 import CoreLocation
+
+// swiftlint:disable file_length
 
 /// Sheet for destination search with POI categories, address search, and favorites.
 struct DestinationSearchView: View {
@@ -404,7 +406,7 @@ struct DestinationSearchView: View {
 // MARK: - MKLocalSearchCompleter Delegate
 
 @MainActor
-class SearchCompleterDelegate: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
+class SearchCompleterDelegate: NSObject, ObservableObject, @MainActor MKLocalSearchCompleterDelegate {
     @Published var results: [MKLocalSearchCompletion] = []
 
     private let completer = MKLocalSearchCompleter()
@@ -426,15 +428,11 @@ class SearchCompleterDelegate: NSObject, ObservableObject, MKLocalSearchComplete
         completer.queryFragment = query
     }
 
-    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        Task { @MainActor in
-            results = completer.results
-        }
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        results = completer.results
     }
 
-    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        Task { @MainActor in
-            results = []
-        }
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        results = []
     }
 }

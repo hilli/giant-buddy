@@ -1,4 +1,4 @@
-import ActivityKit
+@preconcurrency import ActivityKit
 import Foundation
 import OSLog
 
@@ -12,8 +12,8 @@ class LiveActivityManager: ObservableObject {
     private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "LiveActivity")
 
     func cleanupStaleActivities() {
-        for activity in Activity<RideActivityAttributes>.activities {
-            Task {
+        Task { @MainActor in
+            for activity in Activity<RideActivityAttributes>.activities {
                 await activity.end(
                     ActivityContent(state: activity.content.state, staleDate: nil),
                     dismissalPolicy: .immediate
@@ -57,7 +57,7 @@ class LiveActivityManager: ObservableObject {
 
     func updateActivity(speed: Double, distance: Double, elapsed: Int,
                         battery: Int, avgSpeed: Double, power: Double) {
-        guard let activity = currentActivity else { return }
+        guard currentActivity != nil else { return }
 
         let state = RideActivityAttributes.ContentState(
             speed: speed,
@@ -68,25 +68,24 @@ class LiveActivityManager: ObservableObject {
             power: power
         )
 
-        Task {
-            await activity.update(.init(state: state, staleDate: nil))
+        Task { @MainActor in
+            await currentActivity?.update(.init(state: state, staleDate: nil))
         }
     }
 
     func endActivity() {
-        guard let activity = currentActivity else { return }
+        guard currentActivity != nil else { return }
+        isActivityActive = false
 
-        let finalState = activity.content.state
-
-        Task {
+        Task { @MainActor in
+            guard let activity = currentActivity else { return }
+            let finalState = activity.content.state
             await activity.end(
                 .init(state: finalState, staleDate: nil),
                 dismissalPolicy: .immediate
             )
             logger.info("Ended Live Activity: \(activity.id)")
+            currentActivity = nil
         }
-
-        currentActivity = nil
-        isActivityActive = false
     }
 }

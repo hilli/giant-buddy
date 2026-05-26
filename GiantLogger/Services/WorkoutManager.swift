@@ -28,6 +28,7 @@ private final class BackgroundTaskHandle {
 
 /// Manages HealthKit workout lifecycle for outdoor cycling activities.
 @MainActor
+// swiftlint:disable:next type_body_length
 class WorkoutManager: ObservableObject {
 
     @Published var isAuthorized = false
@@ -153,6 +154,7 @@ class WorkoutManager: ObservableObject {
         }
     }
 
+    // swiftlint:disable function_body_length
     /// Stop the workout and save it with ride summary data.
     /// Chains: add samples → endCollection → finishWorkout → finishRoute.
     /// - Parameters:
@@ -231,14 +233,15 @@ class WorkoutManager: ObservableObject {
         }
 
         // Step 1: Add all samples at once
-        let addSamples = { (completion: @escaping () -> Void) in
+        let addSamples: (@escaping @Sendable () -> Void) -> Void = { completion in
             guard !samples.isEmpty else { completion(); return }
+            let sampleCount = samples.count
             builder.add(samples) { [weak self] _, error in
                 Task { @MainActor in
                     if let error {
                         self?.debugLog.log("HK", "Add samples FAILED: \(error.localizedDescription)")
                     } else {
-                        self?.debugLog.log("HK", "Added \(samples.count) samples")
+                        self?.debugLog.log("HK", "Added \(sampleCount) samples")
                     }
                     completion()
                 }
@@ -246,7 +249,7 @@ class WorkoutManager: ObservableObject {
         }
 
         // Step 2: End collection (after samples added)
-        let endCollection = { (completion: @escaping () -> Void) in
+        let endCollection: @Sendable (@escaping @Sendable () -> Void) -> Void = { completion in
             builder.endCollection(withEnd: endDate) { [weak self] success, error in
                 Task { @MainActor in
                     if let error {
@@ -260,7 +263,7 @@ class WorkoutManager: ObservableObject {
         }
 
         // Step 3: Finish workout (after collection ended)
-        let finishWorkout = { [weak self] in
+        let finishWorkout: @Sendable () -> Void = { [weak self] in
             builder.finishWorkout { [weak self] workout, error in
                 Task { @MainActor in
                     if let error {
@@ -299,6 +302,7 @@ class WorkoutManager: ObservableObject {
             }
         }
     }
+    // swiftlint:enable function_body_length
 
     /// Inject a sample 10-minute cycling workout for debugging.
     func injectSampleWorkout() {

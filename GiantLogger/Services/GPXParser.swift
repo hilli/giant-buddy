@@ -89,13 +89,13 @@ private final class GPXParserDelegate: NSObject, XMLParserDelegate {
     private var insideMetadata = false
     private var hasTrackName = false
 
-    private static let isoFormatter: ISO8601DateFormatter = {
+    private let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    private static let isoFormatterNoFrac: ISO8601DateFormatter = {
+    private let isoFormatterNoFrac: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
@@ -162,7 +162,7 @@ private final class GPXParserDelegate: NSObject, XMLParserDelegate {
 
         case "time":
             if insidePoint {
-                let date = Self.isoFormatter.date(from: text) ?? Self.isoFormatterNoFrac.date(from: text)
+                let date = isoFormatter.date(from: text) ?? isoFormatterNoFrac.date(from: text)
                 currentPoint?.timestamp = date
             }
 
