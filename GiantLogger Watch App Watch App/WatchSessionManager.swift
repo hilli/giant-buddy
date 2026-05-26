@@ -41,6 +41,10 @@ class WatchSessionManager: NSObject, ObservableObject {
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
     private var telemetryTimeoutTask: Task<Void, Never>?
+    private var pendingHeartRateSamples: [[String: Any]] = []
+    private var healthKitAuthorizationRequested = false
+    private var lastHapticID: String?
+    private let maxPendingHeartRateSamples = 300
 
     override init() {
         super.init()
@@ -49,6 +53,7 @@ class WatchSessionManager: NSObject, ObservableObject {
             session?.delegate = self
             session?.activate()
         }
+        requestHealthKitAuth()
     }
 
     var formattedDuration: String {
@@ -71,8 +76,12 @@ class WatchSessionManager: NSObject, ObservableObject {
 
     // MARK: - HealthKit Workout
 
-    func requestHealthKitAuth() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
+    func requestHealthKitAuth(completion: ((Bool) -> Void)? = nil) {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            completion?(false)
+            return
+        }
+        healthKitAuthorizationRequested = true
         let share: Set<HKSampleType> = [HKObjectType.workoutType()]
         let read: Set<HKObjectType> = [
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
@@ -84,12 +93,23 @@ class WatchSessionManager: NSObject, ObservableObject {
             } else {
                 print("WatchHK: auth result: \(success)")
             }
+            completion?(success)
         }
     }
 
     func startWorkoutSession() {
         guard HKHealthStore.isHealthDataAvailable(),
               workoutSession == nil else { return }
+
+        if !healthKitAuthorizationRequested {
+            requestHealthKitAuth { [weak self] success in
+                guard success else { return }
+                Task { @MainActor in
+                    self?.startWorkoutSession()
+                }
+            }
+            return
+        }
 
         let config = HKWorkoutConfiguration()
         config.activityType = .cycling
@@ -221,7 +241,8 @@ extension WatchSessionManager: WCSessionDelegate {
     }
 
     nonisolated func session(_: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
-        print("WatchSession: received context with \(applicationContext.count) keys - battery=\(applicationContext["battery"] ?? "nil")")
+        let battery = applicationContext["battery"] ?? "nil"
+        print("WatchSession: received context with \(applicationContext.count) keys - battery=\(battery)")
         Task { @MainActor in
             updateFromContext(applicationContext)
         }
@@ -229,9 +250,13 @@ extension WatchSessionManager: WCSessionDelegate {
 
     nonisolated func session(_: WCSession, didReceiveMessage message: [String: Any]) {
         Task { @MainActor in
-            if message["type"] as? String == "navigation" {
+            let messageType = message["type"] as? String
+            if messageType == "navigation" || messageType == "telemetry" {
                 updateFromContext(message)
-                if let hapticType = message["hapticType"] as? String {
+                if messageType == "navigation", let hapticType = message["hapticType"] as? String {
+                    guard let hapticID = message["hapticID"] as? String,
+                          hapticID != lastHapticID else { return }
+                    lastHapticID = hapticID
                     switch hapticType {
                     case "turn":
                         WKInterfaceDevice.current().play(.directionUp)
@@ -254,6 +279,9 @@ extension WatchSessionManager: WCSessionDelegate {
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
             isPhoneReachable = session.isReachable
+            if session.isReachable {
+                flushPendingHeartRateSamples()
+            }
         }
     }
 }
@@ -261,14 +289,19 @@ extension WatchSessionManager: WCSessionDelegate {
 // MARK: - HealthKit Workout Delegates
 
 extension WatchSessionManager: HKWorkoutSessionDelegate {
-    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession,
-                                     didChangeTo toState: HKWorkoutSessionState,
-                                     from fromState: HKWorkoutSessionState, date: Date) {
+    nonisolated func workoutSession(
+        _ workoutSession: HKWorkoutSession,
+        didChangeTo toState: HKWorkoutSessionState,
+        from fromState: HKWorkoutSessionState,
+        date: Date
+    ) {
         print("WatchHK: workout state \(fromState.rawValue) → \(toState.rawValue)")
     }
 
-    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession,
-                                     didFailWithError error: Error) {
+    nonisolated func workoutSession(
+        _ workoutSession: HKWorkoutSession,
+        didFailWithError error: Error
+    ) {
         print("WatchHK: workout error: \(error.localizedDescription)")
     }
 }
@@ -276,18 +309,20 @@ extension WatchSessionManager: HKWorkoutSessionDelegate {
 extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
     nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
 
-    nonisolated func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder,
-                                     didCollectDataOf collectedTypes: Set<HKSampleType>) {
+    nonisolated func workoutBuilder(
+        _ workoutBuilder: HKLiveWorkoutBuilder,
+        didCollectDataOf collectedTypes: Set<HKSampleType>
+    ) {
         Task { @MainActor in
             for type in collectedTypes {
                 guard let quantityType = type as? HKQuantityType else { continue }
 
                 if quantityType == HKQuantityType(.heartRate),
                    let stats = workoutBuilder.statistics(for: quantityType),
-                   let hr = stats.mostRecentQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())),
-                   hr > 0 {
-                    heartRate = hr
-                    sendHeartRate(hr)
+                   let bpm = stats.mostRecentQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())),
+                   bpm > 0 {
+                    heartRate = bpm
+                    sendHeartRate(bpm)
                 }
 
                 if quantityType == HKQuantityType(.activeEnergyBurned),
@@ -299,12 +334,47 @@ extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
         }
     }
 
-    private func sendHeartRate(_ hr: Double) {
-        guard let session, session.isReachable else { return }
-        session.sendMessage([
+    private func sendHeartRate(_ bpm: Double) {
+        let payload: [String: Any] = [
             "type": "heartRate",
-            "heartRate": hr,
-            "activeCalories": activeCalories
-        ], replyHandler: nil)
+            "heartRate": bpm,
+            "activeCalories": activeCalories,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+
+        guard let session else { return }
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
+                print("WatchSession: HR message failed: \(error.localizedDescription)")
+                Task { @MainActor in
+                    self?.queueHeartRateSample(payload)
+                }
+            }
+        } else {
+            queueHeartRateSample(payload)
+            session.transferUserInfo(payload)
+        }
+    }
+
+    private func queueHeartRateSample(_ payload: [String: Any]) {
+        pendingHeartRateSamples.append(payload)
+        if pendingHeartRateSamples.count > maxPendingHeartRateSamples {
+            pendingHeartRateSamples.removeFirst(pendingHeartRateSamples.count - maxPendingHeartRateSamples)
+        }
+    }
+
+    private func flushPendingHeartRateSamples() {
+        guard let session, session.isReachable, !pendingHeartRateSamples.isEmpty else { return }
+        let samples = pendingHeartRateSamples
+        pendingHeartRateSamples.removeAll()
+        session.sendMessage([
+            "type": "heartRateBatch",
+            "samples": samples
+        ], replyHandler: nil) { [weak self] error in
+            print("WatchSession: HR batch failed: \(error.localizedDescription)")
+            Task { @MainActor in
+                samples.forEach { self?.queueHeartRateSample($0) }
+            }
+        }
     }
 }

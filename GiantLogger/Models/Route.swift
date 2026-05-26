@@ -37,13 +37,14 @@ final class Route {
     }
 
     /// Key waypoints used for turn-by-turn navigation directions.
-    /// Returns user-defined waypoints if available, otherwise falls back to start and end.
+    /// Returns user-defined waypoints if available, otherwise samples the route shape
+    /// so imported GPX/ride routes are not re-routed from only start to finish.
     var navigationWaypoints: [RouteWaypoint] {
         let keyWPs = sortedWaypoints.filter { $0.isKeyWaypoint }
         if keyWPs.count >= 2 { return keyWPs }
         let sorted = sortedWaypoints
         guard sorted.count >= 2 else { return sorted }
-        return [sorted.first!, sorted.last!]
+        return sampledNavigationWaypoints(from: sorted)
     }
 
     var startCoordinate: CLLocationCoordinate2D? {
@@ -94,6 +95,51 @@ final class Route {
         elevationGain = gain
         maxAltitude = maxAlt
         minAltitude = minAlt
+    }
+
+    private func sampledNavigationWaypoints(from waypoints: [RouteWaypoint]) -> [RouteWaypoint] {
+        let maxWaypointCount = 10
+        let targetLegDistance: CLLocationDistance = 2_000
+        guard waypoints.count > maxWaypointCount else { return waypoints }
+
+        let routeDistance = max(totalDistance * 1_000, Self.distance(of: waypoints))
+        let targetCount = min(
+            maxWaypointCount,
+            max(2, Int(ceil(routeDistance / targetLegDistance)) + 1)
+        )
+        guard targetCount < waypoints.count else { return waypoints }
+
+        let targetSpacing = routeDistance / Double(targetCount - 1)
+        var selected: [RouteWaypoint] = [waypoints[0]]
+        var traveled: CLLocationDistance = 0
+        var nextTarget = targetSpacing
+
+        for index in 1..<(waypoints.count - 1) {
+            traveled += Self.distance(from: waypoints[index - 1], to: waypoints[index])
+            if traveled >= nextTarget {
+                selected.append(waypoints[index])
+                nextTarget += targetSpacing
+            }
+        }
+
+        if selected.last?.id != waypoints.last?.id, let last = waypoints.last {
+            selected.append(last)
+        }
+        return selected
+    }
+
+    private static func distance(of waypoints: [RouteWaypoint]) -> CLLocationDistance {
+        guard waypoints.count >= 2 else { return 0 }
+        var distance: CLLocationDistance = 0
+        for index in 1..<waypoints.count {
+            distance += Self.distance(from: waypoints[index - 1], to: waypoints[index])
+        }
+        return distance
+    }
+
+    private static func distance(from start: RouteWaypoint, to end: RouteWaypoint) -> CLLocationDistance {
+        CLLocation(latitude: start.latitude, longitude: start.longitude)
+            .distance(from: CLLocation(latitude: end.latitude, longitude: end.longitude))
     }
 }
 

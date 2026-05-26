@@ -108,6 +108,13 @@
 			);
 			target = TGT000000000000000000001 /* GiantLogger */;
 		};
+		2F12976C2F5DBFF7009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2F12975C2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */;
+		};
 		2F54198C2F5F37FD00138852 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -126,7 +133,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F1296492F5D83D8009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294EF2F5D7B2A009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "dk.hilli.GiantLogger.widget-ios"; sourceTree = "<group>"; };
-		2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "GiantLogger Watch App Watch App"; sourceTree = "<group>"; };
+		2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F12976C2F5DBFF7009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "GiantLogger Watch App Watch App"; sourceTree = "<group>"; };
 		2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F54198C2F5F37FD00138852 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLoggetWatchWidgets; sourceTree = "<group>"; };
 		SRC000000000000000000001 /* GiantLogger */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (EXC000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294F22F5D7BD0009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLogger; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -502,6 +509,7 @@
 				DEVELOPMENT_TEAM = 7NLS34A7F5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "GiantLogger Watch App Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Needed to read your relevant health data";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy records your heart rate during rides.";
@@ -540,6 +548,7 @@
 				DEVELOPMENT_TEAM = 7NLS34A7F5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "GiantLogger Watch App Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Needed to read your relevant health data";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy records your heart rate during rides.";

@@ -8,9 +8,6 @@ struct GiantLoggerWatchApp: App {
         WindowGroup {
             DashboardView()
                 .environmentObject(sessionManager)
-                .onAppear {
-                    sessionManager.requestHealthKitAuth()
-                }
         }
     }
 }

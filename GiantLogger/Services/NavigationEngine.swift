@@ -79,6 +79,7 @@ class NavigationEngine: ObservableObject {
     private var lastAnnouncedStepIndex: Int = -1
     private var lastAnnouncedDistance: AnnouncementThreshold = .none
     private var lastHapticStepIndex: Int = -1
+    private var lastTurnHapticDate = Date.distantPast
     private var offRouteStartTime: Date?
     private var destinationCoordinate: CLLocationCoordinate2D?
     private var lastUpdateLocation: CLLocation?
@@ -88,6 +89,7 @@ class NavigationEngine: ObservableObject {
 
     private let arrivalThreshold: Double = 30 // meters
     private let significantMovement: Double = 3 // meters
+    private let minimumTurnHapticInterval: TimeInterval = 8
 
     private var offRouteThreshold: Double {
         isDestinationNavigation ? 50 : 100
@@ -164,7 +166,7 @@ class NavigationEngine: ObservableObject {
 
             let directions = MKDirections(request: request)
             if let response = try? await directions.calculate(),
-               let leg = response.routes.first {
+               let leg = cyclingRoute(from: response, label: "initial leg") {
                 var steps = leg.steps.filter { !$0.instructions.isEmpty }
                 // Filter intermediate arrive steps from the user-to-start leg
                 steps = steps.filter { step in
@@ -185,7 +187,7 @@ class NavigationEngine: ObservableObject {
             let directions = MKDirections(request: request)
             do {
                 let response = try await directions.calculate()
-                if let route = response.routes.first {
+                if let route = cyclingRoute(from: response, label: "leg \(i + 1)") {
                     var steps = route.steps.filter { !$0.instructions.isEmpty }
                     // Remove intermediate "arrive" steps so navigation continues past mid-route waypoints
                     if i < lastLegIndex {
@@ -201,9 +203,12 @@ class NavigationEngine: ObservableObject {
                     } else {
                         allCoordinates.append(contentsOf: coords)
                     }
+                } else {
+                    throw NavigationError.noCyclingRoute
                 }
             } catch {
                 // Try walking as fallback for this leg
+                print("NavigationEngine: Cycling leg \(i + 1) failed, trying walking: \(error.localizedDescription)")
                 let walkRequest = MKDirections.Request()
                 walkRequest.source = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i].coordinate))
                 walkRequest.destination = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i+1].coordinate))
@@ -227,6 +232,9 @@ class NavigationEngine: ObservableObject {
                     }
                 }
             }
+            if i < lastLegIndex {
+                try? await Task.sleep(for: .milliseconds(150))
+            }
         }
 
         routeSteps = allSteps
@@ -236,6 +244,7 @@ class NavigationEngine: ObservableObject {
         lastAnnouncedStepIndex = -1
         lastAnnouncedDistance = .none
         lastHapticStepIndex = -1
+        clearOffRouteState()
 
         if directionsAvailable {
             updateInstructions()
@@ -251,11 +260,39 @@ class NavigationEngine: ObservableObject {
         lastAnnouncedStepIndex = -1
         lastAnnouncedDistance = .none
         lastHapticStepIndex = -1
+        clearOffRouteState()
         directionsAvailable = true
         totalRouteDistance = route.distance
         remainingDistance = route.distance
         updateInstructions()
         configureAudioSession()
+    }
+
+    private enum NavigationError: LocalizedError {
+        case noCyclingRoute
+
+        var errorDescription: String? {
+            switch self {
+            case .noCyclingRoute:
+                return "No cycling route returned"
+            }
+        }
+    }
+
+    private func cyclingRoute(from response: MKDirections.Response, label: String) -> MKRoute? {
+        if let route = response.routes.first(where: { $0.transportType.contains(.cycling) }) {
+            return route
+        }
+        if !response.routes.isEmpty {
+            print("NavigationEngine: \(label) returned no cycling route; ignoring non-cycling alternatives")
+        }
+        return nil
+    }
+
+    private func clearOffRouteState() {
+        offRouteStartTime = nil
+        isOffRoute = false
+        offRouteDistance = 0
     }
 
     // MARK: - Location Updates
@@ -296,14 +333,16 @@ class NavigationEngine: ObservableObject {
 
         updateInstructions()
 
+        // Off-route / reroute detection
+        handleOffRouteDetection(location: location)
+
+        guard !isOffRoute, !isRerouting else { return }
+
         // Voice guidance
         handleVoiceGuidance()
 
         // Haptic feedback
         handleHapticFeedback()
-
-        // Off-route / reroute detection
-        handleOffRouteDetection(location: location)
     }
 
     private func advanceStepIfNeeded(location: CLLocation) {
@@ -582,10 +621,13 @@ class NavigationEngine: ObservableObject {
 
     private func handleHapticFeedback() {
         guard hapticFeedbackEnabled else { return }
+        guard !isOffRoute, !isRerouting else { return }
         guard currentStepIndex != lastHapticStepIndex else { return }
+        guard Date().timeIntervalSince(lastTurnHapticDate) >= minimumTurnHapticInterval else { return }
 
         if distanceToNextManeuver <= 50 {
             lastHapticStepIndex = currentStepIndex
+            lastTurnHapticDate = Date()
             triggerTurnHaptic()
             // Send turn haptic to Watch
             if let instruction = currentInstruction {
@@ -605,6 +647,7 @@ class NavigationEngine: ObservableObject {
 
     private func handleOffRouteDetection(location: CLLocation) {
         guard !routeCoordinates.isEmpty else { return }
+        guard !isRerouting else { return }
 
         let locationPoint = MKMapPoint(location.coordinate)
         var minDist = Double.greatestFiniteMagnitude
@@ -675,6 +718,15 @@ class NavigationEngine: ObservableObject {
         isRerouting = true
         rerouteFailed = false
 
+        if let activeRoute {
+            await calculateDirections(for: activeRoute, from: location)
+            if directionsAvailable {
+                isRerouting = false
+                return
+            }
+            print("NavigationEngine: Shaped re-route failed, trying direct destination route")
+        }
+
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
@@ -684,10 +736,12 @@ class NavigationEngine: ObservableObject {
 
         do {
             let response = try await directions.calculate()
-            if let route = response.routes.first {
+            if let route = cyclingRoute(from: response, label: "re-route") {
                 applyRoute(route)
                 isRerouting = false
                 return
+            } else {
+                throw NavigationError.noCyclingRoute
             }
         } catch {
             print("NavigationEngine: Re-route cycling failed: \(error.localizedDescription)")
@@ -782,9 +836,11 @@ class NavigationEngine: ObservableObject {
         rerouteFailed = false
         isOffRoute = false
         offRouteDistance = 0
+        offRouteStartTime = nil
         isDestinationNavigation = false
         totalRouteDistance = 0
         remainingDistance = 0
+        lastTurnHapticDate = .distantPast
 
         // Notify Apple Watch that navigation ended
         watchConnectivity.sendNavigationUpdate(

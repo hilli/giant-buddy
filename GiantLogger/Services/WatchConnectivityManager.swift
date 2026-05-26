@@ -1,6 +1,11 @@
 import WatchConnectivity
 import Combine
 
+struct WatchHeartRateSample {
+    let timestamp: Date
+    let bpm: Double
+}
+
 /// Manages WatchConnectivity on the iPhone side, sending telemetry
 /// and navigation updates to the paired Apple Watch.
 @MainActor
@@ -8,6 +13,11 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     static let shared = WatchConnectivityManager()
 
     private var session: WCSession?
+    private var latestContext: [String: Any] = [:]
+    private var lastTelemetryContextPush = Date.distantPast
+    private var recentHeartRateSamples: [WatchHeartRateSample] = []
+    private let transientContextKeys: Set<String> = ["type", "hapticType", "hapticID"]
+    private let maxHeartRateSamples = 3_600
 
     // Heart rate from Watch
     @Published var heartRate: Double = 0
@@ -24,6 +34,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     func activate() {
         guard WCSession.isSupported() else { return }
         session = WCSession.default
+        latestContext = session?.applicationContext ?? [:]
         session?.delegate = self
         session?.activate()
     }
@@ -35,9 +46,11 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         isNavigating: Bool = false, navInstruction: String = "",
         navDistance: Double = 0, navSymbol: String = "arrow.up", navStreet: String? = nil
     ) {
-        guard let session, session.isPaired, session.isWatchAppInstalled else { return }
+        guard let session, session.activationState == .activated,
+              session.isPaired, session.isWatchAppInstalled else { return }
 
-        var context: [String: Any] = [
+        let previousRecording = latestContext["isRecording"] as? Bool
+        let context: [String: Any] = [
             "speed": speed,
             "battery": battery,
             "distance": distance,
@@ -54,40 +67,54 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "navDistance": navDistance,
             "navSymbol": navSymbol
         ]
-        if let navStreet { context["navStreet"] = navStreet }
+        var updates = context
+        if let navStreet { updates["navStreet"] = navStreet }
 
-        try? session.updateApplicationContext(context)
+        mergeAndSendContext(
+            updates,
+            forceApplicationContext: previousRecording != isRecording
+        )
+
+        if session.isReachable {
+            var message = latestContext
+            removeTransientContextKeys(from: &message)
+            message["type"] = "telemetry"
+            session.sendMessage(message, replyHandler: nil) { error in
+                print("WatchConnectivity: telemetry message failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Push current battery/range to Watch for complications (call when bike data arrives).
     func pushBikeDataForComplications() {
-        guard let session, session.isPaired, session.isWatchAppInstalled else {
-            print("WatchConnectivity: pushBikeData skipped - paired=\(session?.isPaired ?? false) installed=\(session?.isWatchAppInstalled ?? false)")
+        guard let session, session.activationState == .activated,
+              session.isPaired, session.isWatchAppInstalled else {
+            print(
+                "WatchConnectivity: pushBikeData skipped - paired=\(session?.isPaired ?? false) "
+                    + "installed=\(session?.isWatchAppInstalled ?? false)"
+            )
             return
         }
 
-        // Merge into existing context so we don't overwrite other fields
-        var context = session.applicationContext
-        context["battery"] = SharedBikeData.batteryPercent
-        context["estimatedRange"] = SharedBikeData.estimatedRange
-        context["bikeName"] = SharedBikeData.bikeName
-        context["isRecording"] = context["isRecording"] ?? false
-        context["totalOdometer"] = SharedBikeData.totalOdometer
-        context["totalUsageHours"] = SharedBikeData.totalUsageHours
-        context["lastPush"] = Date().timeIntervalSince1970
-
-        do {
-            try session.updateApplicationContext(context)
-            print("WatchConnectivity: pushed bike data - battery=\(SharedBikeData.batteryPercent)% range=\(SharedBikeData.estimatedRange)km odo=\(SharedBikeData.totalOdometer)")
-        } catch {
-            print("WatchConnectivity: pushBikeData FAILED: \(error)")
-        }
+        mergeAndSendContext([
+            "battery": SharedBikeData.batteryPercent,
+            "estimatedRange": SharedBikeData.estimatedRange,
+            "bikeName": SharedBikeData.bikeName,
+            "isRecording": latestContext["isRecording"] ?? false,
+            "totalOdometer": SharedBikeData.totalOdometer,
+            "totalUsageHours": SharedBikeData.totalUsageHours
+        ], forceApplicationContext: true)
+        print(
+            "WatchConnectivity: pushed bike data - battery=\(SharedBikeData.batteryPercent)% "
+                + "range=\(SharedBikeData.estimatedRange)km odo=\(SharedBikeData.totalOdometer)"
+        )
     }
 
     /// Explicitly notify Watch that recording has stopped, using both
     /// sendMessage (immediate) and updateApplicationContext (persistent).
     func sendRecordingStop() {
-        guard let session, session.isPaired, session.isWatchAppInstalled else { return }
+        guard let session, session.activationState == .activated,
+              session.isPaired, session.isWatchAppInstalled else { return }
 
         // Immediate delivery if Watch is reachable
         if session.isReachable {
@@ -95,14 +122,12 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         }
 
         // Also update context as a reliable fallback
-        var context = session.applicationContext
-        context["isRecording"] = false
-        context["lastPush"] = Date().timeIntervalSince1970
-        try? session.updateApplicationContext(context)
+        mergeAndSendContext(["isRecording": false], forceApplicationContext: true)
     }
     func sendNavigationUpdate(instruction: String, distance: Double, symbol: String,
                               street: String?, isNavigating: Bool, hapticType: String? = nil) {
-        guard let session, session.isPaired, session.isWatchAppInstalled else { return }
+        guard let session, session.activationState == .activated,
+              session.isPaired, session.isWatchAppInstalled else { return }
 
         var message: [String: Any] = [
             "type": "navigation",
@@ -112,25 +137,94 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             "isNavigating": isNavigating
         ]
         if let street { message["navStreet"] = street }
-        if let hapticType { message["hapticType"] = hapticType }
+        if let hapticType {
+            message["hapticType"] = hapticType
+            message["hapticID"] = UUID().uuidString
+        }
 
         if session.isReachable {
             session.sendMessage(message, replyHandler: nil)
         } else {
-            var context = session.applicationContext
-            for (key, value) in message { context[key] = value }
-            try? session.updateApplicationContext(context)
+            var persistentMessage = message
+            removeTransientContextKeys(from: &persistentMessage)
+            mergeAndSendContext(persistentMessage, forceApplicationContext: true)
+        }
+    }
+
+    func heartRateSamples(since startDate: Date?, through endDate: Date) -> [WatchHeartRateSample] {
+        recentHeartRateSamples.filter { sample in
+            sample.bpm > 0
+                && sample.timestamp <= endDate
+                && startDate.map { sample.timestamp >= $0 } != false
+        }
+    }
+
+    private func mergeAndSendContext(_ updates: [String: Any], forceApplicationContext: Bool) {
+        guard let session else { return }
+        if latestContext.isEmpty {
+            latestContext = session.applicationContext
+        }
+        removeTransientContextKeys(from: &latestContext)
+        for (key, value) in updates {
+            guard !transientContextKeys.contains(key) else { continue }
+            latestContext[key] = value
+        }
+        latestContext["lastPush"] = Date().timeIntervalSince1970
+
+        let shouldPush = forceApplicationContext
+            || Date().timeIntervalSince(lastTelemetryContextPush) >= 10
+        guard shouldPush else { return }
+
+        do {
+            try session.updateApplicationContext(latestContext)
+            lastTelemetryContextPush = Date()
+        } catch {
+            print("WatchConnectivity: application context failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func removeTransientContextKeys(from context: inout [String: Any]) {
+        for key in transientContextKeys {
+            context.removeValue(forKey: key)
+        }
+    }
+
+    private func applyHeartRatePayload(_ payload: [String: Any]) {
+        if let bpm = payload["heartRate"] as? Double, bpm > 0 {
+            heartRate = bpm
+            let timestamp = payload["timestamp"] as? Double ?? Date().timeIntervalSince1970
+            appendHeartRateSample(timestamp: Date(timeIntervalSince1970: timestamp), bpm: bpm)
+        }
+        if let cal = payload["activeCalories"] as? Double {
+            activeCalories = cal
+        }
+    }
+
+    private func appendHeartRateSample(timestamp: Date, bpm: Double) {
+        if recentHeartRateSamples.contains(where: {
+            abs($0.timestamp.timeIntervalSince(timestamp)) < 0.001 && $0.bpm == bpm
+        }) {
+            return
+        }
+        recentHeartRateSamples.append(WatchHeartRateSample(timestamp: timestamp, bpm: bpm))
+        if recentHeartRateSamples.count > maxHeartRateSamples {
+            recentHeartRateSamples.removeFirst(recentHeartRateSamples.count - maxHeartRateSamples)
         }
     }
 }
 
 extension WatchConnectivityManager: WCSessionDelegate {
-    nonisolated func session(_: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {
+    nonisolated func session(
+        _ session: WCSession,
+        activationDidCompleteWith state: WCSessionActivationState,
+        error: Error?
+    ) {
         if let error {
             print("WatchConnectivity: activation failed: \(error)")
         }
         if state == .activated {
             Task { @MainActor in
+                self.latestContext = session.applicationContext
                 self.pushBikeDataForComplications()
             }
         }
@@ -150,8 +244,18 @@ extension WatchConnectivityManager: WCSessionDelegate {
                 default: break
                 }
             } else if let type = message["type"] as? String, type == "heartRate" {
-                if let hr = message["heartRate"] as? Double { self.heartRate = hr }
-                if let cal = message["activeCalories"] as? Double { self.activeCalories = cal }
+                self.applyHeartRatePayload(message)
+            } else if let type = message["type"] as? String, type == "heartRateBatch",
+                      let samples = message["samples"] as? [[String: Any]] {
+                samples.forEach { self.applyHeartRatePayload($0) }
+            }
+        }
+    }
+
+    nonisolated func session(_: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        Task { @MainActor in
+            if userInfo["type"] as? String == "heartRate" {
+                self.applyHeartRatePayload(userInfo)
             }
         }
     }

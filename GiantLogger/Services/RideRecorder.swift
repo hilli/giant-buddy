@@ -157,6 +157,7 @@ class RideRecorder: ObservableObject {
         isRecording = false
         heartRate = 0
         liveActivityManager.endActivity()
+        let stopDate = Date()
 
         let distKm = String(format: "%.2f", accumulatedDistance)
         debugLog.log("Recorder", "Recording stopped — \(sampleCount) samples, \(distKm) km")
@@ -190,13 +191,19 @@ class RideRecorder: ObservableObject {
             } else {
                 // Save workout to HealthKit if enabled
                 if logWorkouts {
-                    let hrSamples = (ride.samples ?? [])
-                        .filter { $0.heartRate > 0 }
-                        .map { (timestamp: $0.timestamp, bpm: $0.heartRate) }
+                    let watchHRSamples = watchConnectivity
+                        .heartRateSamples(since: recordingStartDate, through: stopDate)
+                        .map { (timestamp: $0.timestamp, bpm: $0.bpm) }
+                    let hrSamples = watchHRSamples.isEmpty
+                        ? (ride.samples ?? [])
+                            .filter { $0.heartRate > 0 }
+                            .map { (timestamp: $0.timestamp, bpm: $0.heartRate) }
+                        : watchHRSamples
                     // Compute average rider power (human pedalling effort)
                     let riderPowerSamples = (ride.samples ?? []).filter { $0.torque > 0 && $0.cadence > 0 }
                     let avgRiderPower = riderPowerSamples.isEmpty ? 0.0 :
-                        riderPowerSamples.map { $0.torque * $0.cadence * 0.10472 }.reduce(0, +) / Double(riderPowerSamples.count)
+                        riderPowerSamples.map { $0.torque * $0.cadence * 0.10472 }.reduce(0, +)
+                            / Double(riderPowerSamples.count)
                     workoutManager?.stopWorkout(
                         distance: ride.totalDistance,
                         elevationGain: ride.elevationGain,

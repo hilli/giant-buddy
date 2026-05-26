@@ -4,6 +4,7 @@ import SwiftData
 struct RideListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Ride.startDate, order: .reverse) private var rides: [Ride]
+    @State private var showingAnalytics = false
 
     var body: some View {
         NavigationStack {
@@ -30,6 +31,19 @@ struct RideListView: View {
                 }
             }
             .navigationTitle("Ride History")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingAnalytics = true
+                    } label: {
+                        Image(systemName: "chart.bar")
+                    }
+                    .accessibilityLabel("Analytics")
+                }
+            }
+            .sheet(isPresented: $showingAnalytics) {
+                AnalyticsView()
+            }
         }
     }
 
@@ -90,11 +104,11 @@ struct RideRowView: View {
     }
 
     private func formatDuration(_ seconds: Int) -> String {
-        let h = seconds / 3600
-        let m = (seconds % 3600) / 60
-        if h > 0 {
-            return String(format: "%dh %dm", h, m)
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        if hours > 0 {
+            return String(format: "%dh %dm", hours, minutes)
         }
-        return String(format: "%dm", m)
+        return String(format: "%dm", minutes)
     }
 }

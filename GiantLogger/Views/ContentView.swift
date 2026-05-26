@@ -35,16 +35,16 @@ struct ContentView: View {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
 
-            AnalyticsView()
+            ConnectionView()
                 .tag(3)
                 .tabItem {
-                    Label("Analytics", systemImage: "chart.bar")
+                    Label("Bike", systemImage: "bicycle")
                 }
 
-            ConnectionView()
+            SettingsView()
                 .tag(4)
                 .tabItem {
-                    Label("Bike", systemImage: "bicycle")
+                    Label("Settings", systemImage: "gearshape")
                 }
         }
         .minimizeTabBarOnScrollDownIfAvailable()
