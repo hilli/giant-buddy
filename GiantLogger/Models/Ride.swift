@@ -98,6 +98,7 @@ final class RideSample {
     var heartRate: Double = 0        // BPM from Apple Watch
     var gpsSpeed: Double = 0         // m/s
     var course: Double = 0           // degrees
+    var horizontalAccuracy: Double = -1  // meters; -1 = unknown (legacy samples)
 
     init(timestamp: Date = .now) {
         self.timestamp = timestamp

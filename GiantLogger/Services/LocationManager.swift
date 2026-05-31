@@ -68,6 +68,12 @@ class LocationManager: NSObject, ObservableObject {
 extension LocationManager: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        // Reject invalid (negative accuracy), very poor (>100m), or stale
+        // (cached pre-tracking) fixes so downstream consumers — ride naming,
+        // distance accumulation, navigation — never see bogus coordinates.
+        guard location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy <= 100,
+              abs(location.timestamp.timeIntervalSinceNow) < 30 else { return }
         Task { @MainActor in
             currentLocation = location
         }
