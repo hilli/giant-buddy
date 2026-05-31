@@ -205,6 +205,7 @@ class GiantBikeService: ObservableObject {
             }
 
             isGevConnected = true
+            bikeManager?.persistConnectedDevice()
             debugLog.log("GEV", "GEV session established — requesting static data")
 
             // Request static info sequentially with delays

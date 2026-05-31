@@ -94,10 +94,18 @@ struct DashboardView: View {
                             if bikeManager.connectionState == .connected || bikeService.isGevConnected {
                                 break
                             }
-                            // Auto-connect to the first discovered Giant bike
+                            // Connect to the saved bike if it's in range, otherwise
+                            // the first discovered Giant bike. Preferring the saved
+                            // device avoids latching onto a random nearby bike.
                             if bikeManager.connectionState == .scanning,
-                               let first = bikeManager.discoveredDevices.first {
-                                bikeManager.connect(to: first.peripheral)
+                               !bikeManager.discoveredDevices.isEmpty {
+                                let savedID = UserDefaults.standard.string(forKey: "savedDeviceID")
+                                let target = bikeManager.discoveredDevices.first {
+                                    $0.peripheral.identifier.uuidString == savedID
+                                } ?? bikeManager.discoveredDevices.first
+                                if let target {
+                                    bikeManager.connect(to: target.peripheral)
+                                }
                             }
                         }
                     }
