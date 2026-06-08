@@ -53,7 +53,6 @@ class WatchSessionManager: NSObject, ObservableObject {
             session?.delegate = self
             session?.activate()
         }
-        requestHealthKitAuth()
     }
 
     var formattedDuration: String {
