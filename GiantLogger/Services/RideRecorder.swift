@@ -2,11 +2,14 @@ import Foundation
 import SwiftData
 import Combine
 import CoreLocation
+import MapKit
 import ActivityKit
 import WidgetKit
 import UserNotifications
 import UIKit
 import OSLog
+
+// swiftlint:disable file_length
 
 /// Records ride telemetry + GPS samples and manages ride lifecycle.
 @MainActor
@@ -417,8 +420,6 @@ extension RideRecorder {
 
         let startLoc = CLLocation(latitude: first.latitude, longitude: first.longitude)
         let endLoc = CLLocation(latitude: last.latitude, longitude: last.longitude)
-        let geocoder = CLGeocoder()
-
         // Request background execution time for the network call
         var bgTaskID = UIBackgroundTaskIdentifier.invalid
         bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "geocode-ride") {
@@ -427,8 +428,8 @@ extension RideRecorder {
         }
 
         Task {
-            let startName = await reverseGeocode(geocoder: geocoder, location: startLoc)
-            let endName = await reverseGeocode(geocoder: geocoder, location: endLoc)
+            let startName = await reverseGeocode(location: startLoc)
+            let endName = await reverseGeocode(location: endLoc)
 
             await MainActor.run {
                 if let start = startName, let end = endName, start != end {
@@ -447,12 +448,15 @@ extension RideRecorder {
     }
 
     /// Reverse-geocode a location into a short place name (street or locality).
-    private func reverseGeocode(geocoder: CLGeocoder, location: CLLocation) async -> String? {
+    private func reverseGeocode(location: CLLocation) async -> String? {
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            guard let placemark = placemarks.first else { return nil }
-            // Prefer thoroughfare (street name), fall back to locality
-            return placemark.thoroughfare ?? placemark.locality ?? placemark.subLocality
+            guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
+            let mapItems = try await request.mapItems
+            guard let item = mapItems.first else { return nil }
+            return item.addressRepresentations?.cityName
+                ?? item.addressRepresentations?.cityWithContext
+                ?? item.address?.shortAddress
+                ?? item.name
         } catch {
             debugLog.log("Recorder", "Geocode error: \(error.localizedDescription)")
             return nil

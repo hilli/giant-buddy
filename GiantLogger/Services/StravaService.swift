@@ -277,11 +277,15 @@ class StravaService: NSObject, ObservableObject {
 
 extension StravaService: ASWebAuthenticationPresentationContextProviding {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = scene.windows.first else {
-            return ASPresentationAnchor()
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow)
+            ?? scenes.flatMap(\.windows).first {
+            return window
         }
-        return window
+        guard let scene = scenes.first else {
+            preconditionFailure("Strava authentication requires an active window scene")
+        }
+        return ASPresentationAnchor(windowScene: scene)
     }
 }
 

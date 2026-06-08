@@ -168,7 +168,7 @@ class POISearchService: ObservableObject {
     /// Get cycling directions to a POI result, falling back to walking if unavailable.
     func getDirections(to destination: POIResult, from location: CLLocation) async -> MKRoute? {
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
+        request.source = MKMapItem(coordinate: location.coordinate)
         request.destination = destination.mapItem
         request.transportType = .cycling
 
@@ -213,27 +213,24 @@ class POISearchService: ObservableObject {
     // MARK: - Private Helpers
 
     private func makeResult(from item: MKMapItem, category: POICategory?, userLocation: CLLocation?) -> POIResult {
-        let placemark = item.placemark
-        let address = [
-            placemark.thoroughfare,
-            placemark.subThoroughfare,
-            placemark.locality
-        ]
-        .compactMap { $0 }
-        .joined(separator: " ")
+        let coordinate = item.location.coordinate
+        let address = item.address?.shortAddress
+            ?? item.addressRepresentations?.fullAddress(includingRegion: false, singleLine: true)
+            ?? item.addressRepresentations?.cityWithContext
+            ?? ""
 
         var distance: Double?
         if let userLocation {
             distance = userLocation.distance(from: CLLocation(
-                latitude: placemark.coordinate.latitude,
-                longitude: placemark.coordinate.longitude
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
             ))
         }
 
         return POIResult(
             name: item.name ?? "Unknown",
-            address: address.isEmpty ? (placemark.title ?? "") : address,
-            coordinate: placemark.coordinate,
+            address: address,
+            coordinate: coordinate,
             category: category,
             distance: distance,
             mapItem: item

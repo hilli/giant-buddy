@@ -349,8 +349,8 @@ struct RouteEditorView: View {
 
             for i in 0..<(currentWaypoints.count - 1) {
                 guard !Task.isCancelled else { return }
-                let source = MKMapItem(placemark: MKPlacemark(coordinate: currentWaypoints[i].coordinate))
-                let destination = MKMapItem(placemark: MKPlacemark(coordinate: currentWaypoints[i + 1].coordinate))
+                let source = MKMapItem(coordinate: currentWaypoints[i].coordinate)
+                let destination = MKMapItem(coordinate: currentWaypoints[i + 1].coordinate)
 
                 let request = MKDirections.Request()
                 request.source = source

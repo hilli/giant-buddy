@@ -251,7 +251,7 @@ struct SearchView: View {
             coordinate: fav.coordinate,
             category: nil,
             distance: locationManager.currentLocation.map { fav.distance(from: $0) },
-            mapItem: MKMapItem(placemark: MKPlacemark(coordinate: fav.coordinate))
+            mapItem: MKMapItem(coordinate: fav.coordinate)
         )
         selectedResult = result
         searchService.searchResults = [result]

@@ -160,8 +160,8 @@ class NavigationEngine: ObservableObject {
         if insertUserLeg, let userLocation {
             let firstWP = navWaypoints.first!
             let request = MKDirections.Request()
-            request.source = MKMapItem(placemark: MKPlacemark(coordinate: userLocation.coordinate))
-            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: firstWP.coordinate))
+            request.source = MKMapItem(coordinate: userLocation.coordinate)
+            request.destination = MKMapItem(coordinate: firstWP.coordinate)
             request.transportType = .cycling
 
             let directions = MKDirections(request: request)
@@ -180,8 +180,8 @@ class NavigationEngine: ObservableObject {
 
         for i in 0..<(navWaypoints.count - 1) {
             let request = MKDirections.Request()
-            request.source = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i].coordinate))
-            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i+1].coordinate))
+            request.source = MKMapItem(coordinate: navWaypoints[i].coordinate)
+            request.destination = MKMapItem(coordinate: navWaypoints[i+1].coordinate)
             request.transportType = .cycling
 
             let directions = MKDirections(request: request)
@@ -210,8 +210,8 @@ class NavigationEngine: ObservableObject {
                 // Try walking as fallback for this leg
                 print("NavigationEngine: Cycling leg \(i + 1) failed, trying walking: \(error.localizedDescription)")
                 let walkRequest = MKDirections.Request()
-                walkRequest.source = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i].coordinate))
-                walkRequest.destination = MKMapItem(placemark: MKPlacemark(coordinate: navWaypoints[i+1].coordinate))
+                walkRequest.source = MKMapItem(coordinate: navWaypoints[i].coordinate)
+                walkRequest.destination = MKMapItem(coordinate: navWaypoints[i+1].coordinate)
                 walkRequest.transportType = .walking
                 let walkDirections = MKDirections(request: walkRequest)
                 if let response = try? await walkDirections.calculate(),
@@ -728,8 +728,8 @@ class NavigationEngine: ObservableObject {
         }
 
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.source = MKMapItem(coordinate: location.coordinate)
+        request.destination = MKMapItem(coordinate: destination)
         request.transportType = .cycling
 
         let directions = MKDirections(request: request)
