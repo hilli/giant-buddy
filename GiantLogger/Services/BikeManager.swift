@@ -89,6 +89,24 @@ class BikeManager: NSObject, ObservableObject {
         }
     }
 
+    /// Persist the currently connected peripheral as the saved device. Called only
+    /// after the GEV handshake succeeds, so we never save bikes we haven't actually
+    /// communicated with (e.g. a nearby "Unknown" Giant bike we happened to link to).
+    func persistConnectedDevice() {
+        guard let peripheral = connectedPeripheral else { return }
+        let discoveredName = discoveredDevices.first(where: { $0.peripheral.identifier == peripheral.identifier })?.name
+        let savedName = (peripheral.name ?? discoveredName ?? "Unknown").trimmingCharacters(in: .whitespaces)
+        connectedPeripheralName = (peripheral.name ?? savedName).trimmingCharacters(in: .whitespaces)
+        UserDefaults.standard.set(savedName, forKey: "savedDeviceName")
+        UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: "savedDeviceID")
+        if autoConnectIdentifier != nil {
+            autoConnectIdentifier = peripheral.identifier
+            UserDefaults.standard.set(true, forKey: "autoConnectEnabled")
+        }
+        logger.debug("Saved device as \(savedName, privacy: .public)")
+        debugLog.log("BLE", "Saved device \(savedName) after GEV handshake")
+    }
+
     /// Attempt to reconnect to the saved device. Uses both a pending connect
     /// (instant if system has the peripheral cached) AND an active scan
     /// (forces the radio to discover the peripheral faster).
@@ -351,15 +369,11 @@ extension BikeManager: @MainActor CBCentralManagerDelegate {
             centralManager.stopScan()
             connectionState = .discoveringServices
             connectedPeripheralName = peripheral.name?.trimmingCharacters(in: .whitespaces)
-            let discoveredName = discoveredDevices.first(where: { $0.peripheral.identifier == peripheral.identifier })?.name
-            let savedName = (peripheral.name ?? discoveredName ?? "Unknown").trimmingCharacters(in: .whitespaces)
-            UserDefaults.standard.set(savedName, forKey: "savedDeviceName")
-            UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: "savedDeviceID")
-            if autoConnectIdentifier != nil {
-                autoConnectIdentifier = peripheral.identifier
-                UserDefaults.standard.set(true, forKey: "autoConnectEnabled")
-            }
-            logger.debug("Saved device as \(savedName, privacy: .public)")
+            // Do NOT persist the saved/auto-connect device here. A BLE link alone
+            // does not prove this is the user's bike — a nearby Giant bike can be
+            // connected without ever exchanging GEV data. The device is only saved
+            // once the GEV handshake succeeds (see persistConnectedDevice()), so we
+            // never fixate on bikes we haven't actually communicated with.
             peripheral.discoverServices([serviceUUID])
         }
     }

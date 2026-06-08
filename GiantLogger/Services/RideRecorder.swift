@@ -297,6 +297,7 @@ class RideRecorder: ObservableObject {
         )
         sample.ride = currentRide
         sample.heartRate = watchConnectivity.heartRate
+        sample.horizontalAccuracy = (lat != 0 || lon != 0) ? (location?.horizontalAccuracy ?? -1) : -1
         sample.packetLog = bikeService.getAndClearPacketBuffer()
         if currentRide.samples == nil { currentRide.samples = [] }
         currentRide.samples?.append(sample)
@@ -407,8 +408,9 @@ extension RideRecorder {
     /// Uses a background task to ensure geocoding completes even when
     /// the app is suspended (e.g. phone in pocket).
     func resolveRideName(for ride: Ride, samples: [RideSample]) {
-        let gpsSamples = samples.filter { $0.latitude != 0 || $0.longitude != 0 }
-        guard let first = gpsSamples.first, let last = gpsSamples.last else {
+        let sorted = samples.sorted { $0.timestamp < $1.timestamp }
+        let gpsSamples = sorted.filter { $0.latitude != 0 || $0.longitude != 0 }
+        guard !gpsSamples.isEmpty else {
             ride.name = "Giant eBike Ride"
             try? modelContext?.save()
             return
@@ -418,8 +420,13 @@ extension RideRecorder {
         ride.name = "Giant eBike Ride"
         try? modelContext?.save()
 
-        let startLoc = CLLocation(latitude: first.latitude, longitude: first.longitude)
-        let endLoc = CLLocation(latitude: last.latitude, longitude: last.longitude)
+        // Pick a small window of the most reliable fixes at each end rather than
+        // a single first/last point. A lone cold-start (start) or GPS-dropout
+        // (end) fix often snaps to the wrong nearby street; voting across a few
+        // accurate fixes is far more robust.
+        let startCandidates = Self.namingCandidates(from: gpsSamples, fromStart: true)
+        let endCandidates = Self.namingCandidates(from: gpsSamples, fromStart: false)
+
         // Request background execution time for the network call
         var bgTaskID = UIBackgroundTaskIdentifier.invalid
         bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "geocode-ride") {
@@ -428,14 +435,16 @@ extension RideRecorder {
         }
 
         Task {
-            let startName = await reverseGeocode(location: startLoc)
-            let endName = await reverseGeocode(location: endLoc)
+            let startName = await reverseGeocodeConsensus(samples: startCandidates)
+            let endName = await reverseGeocodeConsensus(samples: endCandidates)
 
             await MainActor.run {
                 if let start = startName, let end = endName, start != end {
                     ride.name = "\(start) → \(end)"
                 } else if let start = startName {
                     ride.name = start
+                } else if let end = endName {
+                    ride.name = end
                 }
                 debugLog.log("Recorder", "Ride named: \(ride.name)")
                 try? modelContext?.save()
@@ -445,6 +454,42 @@ extension RideRecorder {
                 }
             }
         }
+    }
+
+    /// Select up to 3 reliable fixes at the start or end of a ride for naming.
+    /// Prefers fixes accurate to within 50 m; falls back to raw endpoints when
+    /// no accuracy data is available (e.g. legacy rides) or none qualify.
+    private static func namingCandidates(from gpsSamples: [RideSample], fromStart: Bool) -> [RideSample] {
+        let maxCandidates = 3
+        let accuracyThreshold = 50.0
+        let accurate = gpsSamples.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= accuracyThreshold }
+        let pool = accurate.isEmpty ? gpsSamples : accurate
+        guard !pool.isEmpty else { return [] }
+        return fromStart
+            ? Array(pool.prefix(maxCandidates))
+            : Array(pool.suffix(maxCandidates))
+    }
+
+    /// Reverse-geocode several nearby fixes and return the most frequently
+    /// resolved place name, which is more robust than trusting one coordinate.
+    private func reverseGeocodeConsensus(samples: [RideSample]) async -> String? {
+        var tally: [String: Int] = [:]
+        var order: [String] = []
+        for sample in samples {
+            let loc = CLLocation(latitude: sample.latitude, longitude: sample.longitude)
+            if let name = await reverseGeocode(location: loc) {
+                if tally[name] == nil { order.append(name) }
+                tally[name, default: 0] += 1
+            }
+        }
+        // Most frequent name wins; ties broken by earliest occurrence.
+        var best: String?
+        var bestCount = 0
+        for name in order where (tally[name] ?? 0) > bestCount {
+            best = name
+            bestCount = tally[name] ?? 0
+        }
+        return best
     }
 
     /// Reverse-geocode a location into a short place name (street or locality).
