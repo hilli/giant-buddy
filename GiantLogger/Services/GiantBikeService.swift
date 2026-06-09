@@ -5,9 +5,12 @@ import SwiftData
 import UIKit
 import WidgetKit
 
+// swiftlint:disable file_length
+
 /// High-level interface to the Giant e-bike. Sends commands, parses responses,
 /// and publishes live telemetry data.
 @MainActor
+// swiftlint:disable:next type_body_length
 class GiantBikeService: ObservableObject {
 
     @Published var rideData = RideData()

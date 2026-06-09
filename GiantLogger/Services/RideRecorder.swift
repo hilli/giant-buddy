@@ -13,6 +13,7 @@ import OSLog
 
 /// Records ride telemetry + GPS samples and manages ride lifecycle.
 @MainActor
+// swiftlint:disable:next type_body_length
 class RideRecorder: ObservableObject {
 
     @Published var isRecording = false
@@ -259,6 +260,7 @@ class RideRecorder: ObservableObject {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private func recordSample() {
         guard let bikeService, let currentRide, let modelContext else { return }
 

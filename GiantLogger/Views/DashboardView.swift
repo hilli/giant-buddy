@@ -2,6 +2,9 @@ import SwiftUI
 import MapKit
 import WeatherKit
 
+// swiftlint:disable file_length
+
+// swiftlint:disable:next type_body_length
 struct DashboardView: View {
     @EnvironmentObject var bikeService: GiantBikeService
     @EnvironmentObject var bikeManager: BikeManager
