@@ -61,7 +61,7 @@ class CrashDetector: ObservableObject {
         recentMagnitudes = []
         impactTimestamps = []
 
-        motionManager.startAccelerometerUpdates(to: motionQueue) { [weak self] data, _ in
+        motionManager.startAccelerometerUpdates(to: motionQueue) { @Sendable [weak self] data, _ in
             guard let self, let data else { return }
             let mag = Self.magnitude(data.acceleration)
 
@@ -211,7 +211,7 @@ class CrashDetector: ObservableObject {
         isTestMode = false
     }
 
-    private static func magnitude(_ accel: CMAcceleration) -> Double {
+    private nonisolated static func magnitude(_ accel: CMAcceleration) -> Double {
         sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z)
     }
 
