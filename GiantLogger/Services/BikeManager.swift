@@ -119,7 +119,19 @@ class BikeManager: NSObject, ObservableObject {
         // If already connected or discovering services, nothing to do
         if connectionState == .connected || connectionState == .discoveringServices { return }
 
-        // If stuck in .connecting or .scanning for too long, reset and retry
+        // A pending connect() by identifier never times out and fires the moment
+        // the bike advertises — identical to the reliable background path. If one is
+        // already in flight for the saved peripheral, leave it untouched. The
+        // foreground retry loop calls this every 30s; it used to cancel the in-flight
+        // connect and restart, which is exactly why the bike only connected once the
+        // app was backgrounded (loop stopped, pending connect left alone). Don't churn it.
+        if connectionState == .connecting,
+           let pending = connectedPeripheral, pending.identifier == savedID {
+            debugLog.log("BLE", "Auto-reconnect: pending connect already in flight; leaving it")
+            return
+        }
+
+        // If stuck in .scanning (or .connecting with no in-flight connect), reset and retry
         if connectionState == .connecting || connectionState == .scanning {
             debugLog.log("BLE", "Auto-reconnect: resetting stale \(connectionState.rawValue) state")
             if let peripheral = connectedPeripheral {
@@ -158,22 +170,25 @@ class BikeManager: NSObject, ObservableObject {
         ])
 
         // Timeout: stop scanning after 15s in foreground
+        scheduleForegroundScanTimeout()
+    }
+
+    /// In the foreground, stop the active scan after 15s. If a pending connect is
+    /// still in flight it is left to continue; otherwise we fall back to disconnected.
+    private func scheduleForegroundScanTimeout() {
         connectTimeoutTask?.cancel()
-        if UIApplication.shared.applicationState == .active {
-            connectTimeoutTask = Task {
-                try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled else { return }
-                if connectionState == .scanning {
-                    centralManager.stopScan()
-                    if connectedPeripheral != nil {
-                        // Direct connect is still pending, let it continue
-                        connectionState = .connecting
-                        debugLog.log("BLE", "Scan timed out; pending connect continues")
-                    } else {
-                        connectionState = .disconnected
-                        debugLog.log("BLE", "Scan timed out; no peripheral found")
-                    }
-                }
+        guard UIApplication.shared.applicationState == .active else { return }
+        connectTimeoutTask = Task {
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled, connectionState == .scanning else { return }
+            centralManager.stopScan()
+            if connectedPeripheral != nil {
+                // Direct connect is still pending, let it continue
+                connectionState = .connecting
+                debugLog.log("BLE", "Scan timed out; pending connect continues")
+            } else {
+                connectionState = .disconnected
+                debugLog.log("BLE", "Scan timed out; no peripheral found")
             }
         }
     }
