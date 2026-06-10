@@ -93,7 +93,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             var message = latestContext
             removeTransientContextKeys(from: &message)
             message["type"] = "telemetry"
-            session.sendMessage(message, replyHandler: nil) { error in
+            session.sendMessage(message, replyHandler: nil) { @Sendable error in
                 print("WatchConnectivity: telemetry message failed: \(error.localizedDescription)")
             }
         }

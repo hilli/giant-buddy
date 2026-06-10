@@ -358,7 +358,7 @@ extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
 
         guard let session else { return }
         if session.isReachable {
-            session.sendMessage(payload.dictionary, replyHandler: nil) { [weak self] error in
+            session.sendMessage(payload.dictionary, replyHandler: nil) { @Sendable [weak self] error in
                 print("WatchSession: HR message failed: \(error.localizedDescription)")
                 Task { @MainActor in
                     self?.queueHeartRateSample(payload)
@@ -384,7 +384,7 @@ extension WatchSessionManager: HKLiveWorkoutBuilderDelegate {
         session.sendMessage([
             "type": "heartRateBatch",
             "samples": samples.map(\.dictionary)
-        ], replyHandler: nil) { [weak self] error in
+        ], replyHandler: nil) { @Sendable [weak self] error in
             print("WatchSession: HR batch failed: \(error.localizedDescription)")
             Task { @MainActor in
                 samples.forEach { self?.queueHeartRateSample($0) }
