@@ -142,6 +142,7 @@ class RideRecorder: ObservableObject {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func stopRecording() {
         let bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "stop-recording") {
             Task { @MainActor in
@@ -193,38 +194,21 @@ class RideRecorder: ObservableObject {
                 if logWorkouts { workoutManager?.discardWorkout() }
                 modelContext?.delete(ride)
             } else {
-                // Save workout to HealthKit if enabled
-                if logWorkouts {
-                    let watchHRSamples = watchConnectivity
-                        .heartRateSamples(since: recordingStartDate, through: stopDate)
-                        .map { (timestamp: $0.timestamp, bpm: $0.bpm) }
-                    let hrSamples = watchHRSamples.isEmpty
-                        ? (ride.samples ?? [])
-                            .filter { $0.heartRate > 0 }
-                            .map { (timestamp: $0.timestamp, bpm: $0.heartRate) }
-                        : watchHRSamples
-                    // Compute average rider power (human pedalling effort)
-                    let riderPowerSamples = (ride.samples ?? []).filter { $0.torque > 0 && $0.cadence > 0 }
-                    let avgRiderPower = riderPowerSamples.isEmpty ? 0.0 :
-                        riderPowerSamples.map { $0.torque * $0.cadence * 0.10472 }.reduce(0, +)
-                            / Double(riderPowerSamples.count)
-                    workoutManager?.stopWorkout(
-                        distance: ride.totalDistance,
-                        elevationGain: ride.elevationGain,
-                        avgMotorPower: ride.avgPower,
-                        avgRiderPower: avgRiderPower,
-                        duration: TimeInterval(ride.duration),
-                        heartRateSamples: hrSamples
-                    )
-                }
-
-                // Auto-upload to Strava if enabled
-                if let strava = stravaService, strava.isConnected && strava.autoUpload {
-                    let rideToUpload = ride
-                    Task {
-                        try? await strava.uploadRide(rideToUpload)
-                    }
-                }
+                // Heart-rate + rider-power samples (captured now; recordingStartDate
+                // is cleared before the async finalize below runs).
+                let watchHRSamples = watchConnectivity
+                    .heartRateSamples(since: recordingStartDate, through: stopDate)
+                    .map { (timestamp: $0.timestamp, bpm: $0.bpm) }
+                let hrSamples = watchHRSamples.isEmpty
+                    ? (ride.samples ?? [])
+                        .filter { $0.heartRate > 0 }
+                        .map { (timestamp: $0.timestamp, bpm: $0.heartRate) }
+                    : watchHRSamples
+                // Average rider power (human pedalling effort)
+                let riderPowerSamples = (ride.samples ?? []).filter { $0.torque > 0 && $0.cadence > 0 }
+                let avgRiderPower = riderPowerSamples.isEmpty ? 0.0 :
+                    riderPowerSamples.map { $0.torque * $0.cadence * 0.10472 }.reduce(0, +)
+                        / Double(riderPowerSamples.count)
 
                 SharedBikeData.lastRideDate = ride.startDate
                 SharedBikeData.lastRideDistance = ride.totalDistance
@@ -233,8 +217,16 @@ class RideRecorder: ObservableObject {
                 SharedBikeData.lastRideElevationGain = ride.elevationGain
                 WidgetCenter.shared.reloadAllTimelines()
 
-                // Reverse-geocode start/end to generate a ride name
-                resolveRideName(for: ride, samples: samples)
+                // Resolve the ride name (planned route name when navigating, else a
+                // reverse-geocoded "Start → End"), then save the HealthKit workout
+                // titled with that name.
+                finalizeRide(
+                    ride,
+                    samples: samples,
+                    routeName: navigationEngine?.activeRoute?.name,
+                    heartRateSamples: hrSamples,
+                    avgRiderPower: avgRiderPower
+                )
             }
         }
         try? modelContext?.save()
@@ -405,22 +397,74 @@ extension RideRecorder {
 
 extension RideRecorder {
 
-    /// Resolve a human-readable ride name from start/end GPS coordinates.
-    /// Falls back to "Giant eBike Ride" on failure or missing data.
-    /// Uses a background task to ensure geocoding completes even when
-    /// the app is suspended (e.g. phone in pocket).
-    func resolveRideName(for ride: Ride, samples: [RideSample]) {
-        let sorted = samples.sorted { $0.timestamp < $1.timestamp }
-        let gpsSamples = sorted.filter { $0.latitude != 0 || $0.longitude != 0 }
-        guard !gpsSamples.isEmpty else {
-            ride.name = "Giant eBike Ride"
-            try? modelContext?.save()
-            return
-        }
-
-        // Set fallback immediately so the ride is never unnamed
+    /// Resolve the ride's display name, then save the HealthKit workout and upload
+    /// to Strava — all under one background task so geocoding, the HealthKit save,
+    /// and the network upload complete even when the app is suspended (e.g. phone
+    /// in pocket after an auto-stop). The planned route name is used when
+    /// navigating; otherwise a reverse-geocoded "Start → End" name is computed.
+    /// The workout/Strava activity is titled *after* the name resolves (HealthKit
+    /// workout metadata is immutable once finished).
+    func finalizeRide(_ ride: Ride, samples: [RideSample], routeName: String?,
+                      heartRateSamples: [(timestamp: Date, bpm: Double)],
+                      avgRiderPower: Double) {
+        // Set fallback name immediately so the ride is never unnamed.
         ride.name = "Giant eBike Ride"
         try? modelContext?.save()
+
+        // Request background execution time for the geocode + HealthKit save.
+        var bgTaskID = UIBackgroundTaskIdentifier.invalid
+        bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "finalize-ride") {
+            UIApplication.shared.endBackgroundTask(bgTaskID)
+            bgTaskID = .invalid
+        }
+
+        let saveWorkout = logWorkouts
+        Task { @MainActor in
+            let title = await resolvedRideName(routeName: routeName, samples: samples)
+            ride.name = title
+            try? modelContext?.save()
+            debugLog.log("Recorder", "Ride named: \(title)")
+
+            if saveWorkout {
+                workoutManager?.stopWorkout(
+                    title: title,
+                    distance: ride.totalDistance,
+                    elevationGain: ride.elevationGain,
+                    avgMotorPower: ride.avgPower,
+                    avgRiderPower: avgRiderPower,
+                    duration: TimeInterval(ride.duration),
+                    heartRateSamples: heartRateSamples
+                )
+            }
+
+            // Auto-upload to Strava under the same background assertion so the
+            // request survives app suspension (e.g. phone back in pocket after an
+            // auto-stop). Errors are logged instead of silently swallowed.
+            if let strava = stravaService, strava.isConnected, strava.autoUpload {
+                do {
+                    try await strava.uploadRide(ride)
+                    debugLog.log("Strava", "Upload succeeded ✅ \(ride.name)")
+                } catch {
+                    debugLog.log("Strava", "Upload FAILED: \(error.localizedDescription)")
+                }
+            }
+
+            if bgTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTaskID)
+            }
+        }
+    }
+
+    /// Resolve a human-readable ride name: the active route name when navigating,
+    /// otherwise a reverse-geocoded "Start → End" (falling back to a generic name).
+    private func resolvedRideName(routeName: String?, samples: [RideSample]) async -> String {
+        if let routeName, !routeName.trimmingCharacters(in: .whitespaces).isEmpty {
+            return routeName
+        }
+
+        let sorted = samples.sorted { $0.timestamp < $1.timestamp }
+        let gpsSamples = sorted.filter { $0.latitude != 0 || $0.longitude != 0 }
+        guard !gpsSamples.isEmpty else { return "Giant eBike Ride" }
 
         // Pick a small window of the most reliable fixes at each end rather than
         // a single first/last point. A lone cold-start (start) or GPS-dropout
@@ -428,34 +472,17 @@ extension RideRecorder {
         // accurate fixes is far more robust.
         let startCandidates = Self.namingCandidates(from: gpsSamples, fromStart: true)
         let endCandidates = Self.namingCandidates(from: gpsSamples, fromStart: false)
+        let startName = await reverseGeocodeConsensus(samples: startCandidates)
+        let endName = await reverseGeocodeConsensus(samples: endCandidates)
 
-        // Request background execution time for the network call
-        var bgTaskID = UIBackgroundTaskIdentifier.invalid
-        bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "geocode-ride") {
-            UIApplication.shared.endBackgroundTask(bgTaskID)
-            bgTaskID = .invalid
+        if let start = startName, let end = endName, start != end {
+            return "\(start) → \(end)"
+        } else if let start = startName {
+            return start
+        } else if let end = endName {
+            return end
         }
-
-        Task {
-            let startName = await reverseGeocodeConsensus(samples: startCandidates)
-            let endName = await reverseGeocodeConsensus(samples: endCandidates)
-
-            await MainActor.run {
-                if let start = startName, let end = endName, start != end {
-                    ride.name = "\(start) → \(end)"
-                } else if let start = startName {
-                    ride.name = start
-                } else if let end = endName {
-                    ride.name = end
-                }
-                debugLog.log("Recorder", "Ride named: \(ride.name)")
-                try? modelContext?.save()
-
-                if bgTaskID != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTaskID)
-                }
-            }
-        }
+        return "Giant eBike Ride"
     }
 
     /// Select up to 3 reliable fixes at the start or end of a ride for naming.

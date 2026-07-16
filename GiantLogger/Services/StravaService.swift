@@ -183,7 +183,7 @@ class StravaService: NSObject, ObservableObject {
 
         let boundary = UUID().uuidString
         let dateStr = ride.startDate.formatted(.dateTime.month().day().year())
-        let name = "Giant E-Bike Ride \(dateStr)"
+        let name = ride.name.isEmpty ? "Giant E-Bike Ride \(dateStr)" : ride.name
 
         var body = Data()
         func appendField(_ name: String, _ value: String) {

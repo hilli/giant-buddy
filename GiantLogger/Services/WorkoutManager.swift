@@ -4,6 +4,8 @@ import CoreLocation
 import os
 import UIKit
 
+// swiftlint:disable file_length
+
 @MainActor
 private final class BackgroundTaskHandle {
     private var identifier: UIBackgroundTaskIdentifier = .invalid
@@ -58,10 +60,10 @@ class WorkoutManager: ObservableObject {
         return types
     }
 
-    /// Types we read.
-    private var typesToRead: Set<HKObjectType> {
-        Set([HKObjectType.workoutType()])
-    }
+    /// The app only writes workouts to HealthKit; it never queries them back, so
+    /// no read authorization is requested (avoids an unnecessary "read workouts"
+    /// prompt).
+    private let typesToRead: Set<HKObjectType> = []
 
     func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else {
@@ -77,6 +79,34 @@ class WorkoutManager: ObservableObject {
                     self?.debugLog.log("HK", "Auth error: \(error.localizedDescription)")
                 } else {
                     self?.debugLog.log("HK", "Auth result: \(success)")
+                }
+            }
+        }
+    }
+
+    /// Whether we currently hold write authorization for workouts.
+    private func workoutSharingAuthorized() -> Bool {
+        healthStore.authorizationStatus(for: HKObjectType.workoutType()) == .sharingAuthorized
+    }
+
+    /// Re-acquire a valid HealthKit authorization assertion before a save.
+    /// iOS 26/27 betas intermittently drop the privacy-service assertion
+    /// ("Unable to acquire legacy assertion on com.apple.HealthPrivacyService"),
+    /// which surfaces as "Authorization is not determined" and a nil finishWorkout.
+    /// Re-requesting re-establishes the assertion without re-prompting when the
+    /// user has already made a choice.
+    @discardableResult
+    private func ensureAuthorized() async -> Bool {
+        guard HKHealthStore.isHealthDataAvailable() else { return false }
+        if workoutSharingAuthorized() { return true }
+        debugLog.log("HK", "Authorization not granted — re-requesting before workout operation")
+        return await withCheckedContinuation { continuation in
+            healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead) { [weak self] _, error in
+                Task { @MainActor in
+                    if let error {
+                        self?.debugLog.log("HK", "Re-auth error: \(error.localizedDescription)")
+                    }
+                    continuation.resume(returning: self?.workoutSharingAuthorized() ?? false)
                 }
             }
         }
@@ -103,6 +133,10 @@ class WorkoutManager: ObservableObject {
         self.workoutStartDate = now
 
         debugLog.log("HK", "Starting outdoor cycling workout...")
+
+        // Warm up / re-acquire the authorization assertion early so the save at
+        // stop time is far less likely to hit a dropped iOS-beta assertion.
+        Task { @MainActor [weak self] in await self?.ensureAuthorized() }
 
         builder.beginCollection(withStart: now) { [weak self] success, error in
             Task { @MainActor in
@@ -154,17 +188,19 @@ class WorkoutManager: ObservableObject {
         }
     }
 
-    // swiftlint:disable function_body_length
+    // swiftlint:disable function_body_length cyclomatic_complexity
     /// Stop the workout and save it with ride summary data.
-    /// Chains: add samples → endCollection → finishWorkout → finishRoute.
+    /// Chains: ensure auth + set title → add samples → endCollection → finishWorkout → finishRoute.
     /// - Parameters:
+    ///   - title: Workout title shown in Apple Fitness (route name, or geocoded ride name).
     ///   - distance: Total ride distance in km.
     ///   - elevationGain: Total elevation gain in meters.
     ///   - avgMotorPower: Average motor power output in watts.
     ///   - avgRiderPower: Average human pedalling power in watts (torque × cadence × 2π/60).
     ///   - duration: Ride duration in seconds.
     ///   - heartRateSamples: Per-sample HR readings relayed from Apple Watch.
-    func stopWorkout(distance: Double, elevationGain: Double,
+    func stopWorkout(title: String? = nil,
+                     distance: Double, elevationGain: Double,
                      avgMotorPower: Double, avgRiderPower: Double,
                      duration: TimeInterval,
                      heartRateSamples: [(timestamp: Date, bpm: Double)] = []) {
@@ -295,14 +331,32 @@ class WorkoutManager: ObservableObject {
             }
         }
 
-        // Chain: addSamples → endCollection → finishWorkout
-        addSamples {
-            endCollection {
-                finishWorkout()
+        // Chain: (ensure auth + set title) → addSamples → endCollection → finishWorkout.
+        // iOS beta intermittently drops the HealthKit authorization assertion,
+        // causing "Authorization is not determined" and a nil finishWorkout, so we
+        // re-acquire it here before saving. The title (route/ride name) is written
+        // as brand metadata, which the Fitness app shows as the workout title.
+        Task { @MainActor in
+            let authed = await self.ensureAuthorized()
+            if !authed {
+                self.debugLog.log("HK", "WARN: HealthKit not authorized at save — attempting save anyway")
+            }
+            if let title, !title.isEmpty {
+                do {
+                    try await builder.addMetadata([HKMetadataKeyWorkoutBrandName: title])
+                    self.debugLog.log("HK", "Workout title set: \(title)")
+                } catch {
+                    self.debugLog.log("HK", "Title metadata error: \(error.localizedDescription)")
+                }
+            }
+            addSamples {
+                endCollection {
+                    finishWorkout()
+                }
             }
         }
     }
-    // swiftlint:enable function_body_length
+    // swiftlint:enable function_body_length cyclomatic_complexity
 
     /// Inject a sample 10-minute cycling workout for debugging.
     func injectSampleWorkout() {

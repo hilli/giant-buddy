@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 
+// swiftlint:disable:next type_body_length
 struct SettingsView: View {
     @EnvironmentObject var bikeManager: BikeManager
     @EnvironmentObject var rideRecorder: RideRecorder
@@ -79,6 +80,11 @@ struct SettingsView: View {
                     if savedDeviceName.isEmpty {
                         Text("No saved device")
                             .foregroundStyle(.secondary)
+                        Button {
+                            NotificationCenter.default.post(name: .switchToBikeTab, object: nil)
+                        } label: {
+                            Label("Find My Bike", systemImage: "bicycle")
+                        }
                     } else {
                         HStack {
                             Text("Device")

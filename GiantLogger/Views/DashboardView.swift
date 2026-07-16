@@ -16,6 +16,8 @@ struct DashboardView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
+    @AppStorage("savedDeviceID") private var savedDeviceID = ""
+
     @State private var mapCameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var showSearch = false
     @State private var lastWeatherFetchLocation: CLLocation?
@@ -48,6 +50,11 @@ struct DashboardView: View {
                     VStack(spacing: 16) {
                         // Connection status bar
                         connectionStatusBar
+
+                        // No bike registered yet — link to the Bike tab
+                        if savedDeviceID.isEmpty {
+                            noBikeRegisteredBanner
+                        }
 
                         // Bike disconnected but still navigating
                         if !bikeService.isGevConnected && navigationEngine.activeRoute != nil && !dismissedNavBanner {
@@ -431,6 +438,33 @@ struct DashboardView: View {
         .padding(10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal, 4)
+    }
+
+    private var noBikeRegisteredBanner: some View {
+        Button {
+            NotificationCenter.default.post(name: .switchToBikeTab, object: nil)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "bicycle")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("No Bike Connected")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.primary)
+                    Text("Tap to find and connect your Giant bike")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 
     private var connectionStatusBar: some View {

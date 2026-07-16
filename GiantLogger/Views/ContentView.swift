@@ -59,6 +59,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .switchToHistoryTab)) { _ in
             selectedTab = 2
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToBikeTab)) { _ in
+            selectedTab = 3
+        }
         .onChange(of: rideRecorder.isRecording) { _, isRecording in
             let enabled = UserDefaults.standard.bool(forKey: "crashDetectionEnabled")
             if isRecording && enabled {
@@ -97,6 +100,7 @@ struct ContentView: View {
 extension Notification.Name {
     static let switchToRideTab = Notification.Name("switchToRideTab")
     static let switchToHistoryTab = Notification.Name("switchToHistoryTab")
+    static let switchToBikeTab = Notification.Name("switchToBikeTab")
     static let gpxImportResult = Notification.Name("gpxImportResult")
 }
 
