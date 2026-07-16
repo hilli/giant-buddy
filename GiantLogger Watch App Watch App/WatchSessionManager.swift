@@ -81,12 +81,15 @@ class WatchSessionManager: NSObject, ObservableObject {
             return
         }
         healthKitAuthorizationRequested = true
-        let share: Set<HKSampleType> = [HKObjectType.workoutType()]
+        // The Watch only reads live heart rate / active energy from the sensors and
+        // always discards its workout (the iPhone is the single source of truth that
+        // saves the HealthKit workout), so it never calls finishWorkout — no
+        // share/write authorization is needed. beginCollection only requires read.
         let read: Set<HKObjectType> = [
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
             HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!
         ]
-        healthStore.requestAuthorization(toShare: share, read: read) { success, error in
+        healthStore.requestAuthorization(toShare: nil, read: read) { success, error in
             if let error {
                 print("WatchHK: auth error: \(error.localizedDescription)")
             } else {
