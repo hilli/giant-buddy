@@ -1,6 +1,6 @@
 # Privacy Policy — Giant Buddy
 
-**Last updated:** March 29, 2026
+**Last updated:** October 7, 2026
 
 Giant Buddy is an open-source iOS app for Giant e-bikes with RideControl+ BLE connectivity. This privacy policy explains what data the app collects, how it is used, and your choices.
 
@@ -26,7 +26,7 @@ Source code: [github.com/hilli/giant-buddy](https://github.com/hilli/giant-buddy
 ### Contacts
 - **What:** Contact names and phone numbers you select as emergency contacts.
 - **Why:** To send an SMS alert with your GPS location if the crash detection feature triggers.
-- **Storage:** Emergency contact info is stored locally in UserDefaults on your device only.
+- **Storage:** Emergency contact info is stored locally in UserDefaults on your device only. It only leaves your device in an SMS that you review and send yourself.
 
 ### Motion (Accelerometer)
 - **What:** Device accelerometer data while riding.
@@ -38,8 +38,11 @@ Source code: [github.com/hilli/giant-buddy](https://github.com/hilli/giant-buddy
 ### Strava (optional)
 If you connect your Strava account, Giant Buddy can upload ride GPX files to Strava via their API. This is entirely opt-in and requires explicit OAuth authorization. Giant Buddy stores your Strava access token in the iOS Keychain. You can disconnect at any time in Settings.
 
-### Open-Meteo (weather/elevation)
-Giant Buddy sends your current GPS coordinates to the [Open-Meteo API](https://open-meteo.com) to fetch weather conditions and elevation data. Open-Meteo is a free, open-source weather API. No API key or account is required. No personal identifiers are sent.
+### Open-Meteo (elevation)
+Giant Buddy sends GPS coordinates to the [Open-Meteo API](https://open-meteo.com) to fetch elevation data. Open-Meteo is a free, open-source API. No API key or account is required. No personal identifiers are sent.
+
+### Apple WeatherKit
+Giant Buddy sends your current location to Apple's WeatherKit service to show current weather conditions. This is governed by [Apple's privacy policy](https://www.apple.com/legal/privacy/).
 
 ### Apple CloudKit
 Ride history and routes are synced to your private iCloud database via Apple CloudKit. This data is only accessible to your Apple ID and is governed by [Apple's privacy policy](https://www.apple.com/legal/privacy/).

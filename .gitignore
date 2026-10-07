@@ -30,6 +30,8 @@ Pods/
 
 # Secrets
 StravaSecrets.swift
+*.p8
+docs/appstore/review_contact.local.json
 
 # macOS
 .DS_Store

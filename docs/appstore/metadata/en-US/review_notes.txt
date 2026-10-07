@@ -1,0 +1,11 @@
+Giant Buddy is an independent ride computer for Giant e-bikes that use the RideControl / GEV Bluetooth LE protocol. A compatible e-bike is required to see live telemetry, so we have recorded a demo of the app connected to a real bike (Giant Stormguard E+ 2, 2023):
+
+https://youtube.com/shorts/R4iE35moApc
+
+Notes for review:
+- No account or login is required. All data stays on the device and in the user's private iCloud (CloudKit).
+- Without a bike, you can still explore: Routes (import a GPX file or plan an A to B route), navigation preview, ride history, Settings, and the Apple Watch app.
+- Strava upload is optional and uses Strava's own OAuth sign-in.
+- Crash detection never sends anything automatically. It opens the standard Messages composer prefilled with the location, and the user must tap Send.
+- Bluetooth is used only to talk to the user's e-bike. Location is used for ride recording and navigation, including in the background during an active ride.
+- HealthKit is used to save cycling workouts when the user enables it.

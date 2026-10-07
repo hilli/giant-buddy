@@ -27,8 +27,8 @@ struct GiantLoggerApp: App {
         let schema = Schema([Ride.self, RideSample.self, Route.self, RouteWaypoint.self, MaintenanceItem.self, BatterySnapshot.self, ErrorLogEntry.self])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic
+            isStoredInMemoryOnly: ScreenshotMode.isEnabled,
+            cloudKitDatabase: ScreenshotMode.isEnabled ? .none : .automatic
         )
 
         do {
@@ -123,6 +123,15 @@ struct GiantLoggerApp: App {
         } else {
             services = Self.createServices()
             Self._services = services
+            if ScreenshotMode.isEnabled {
+                ScreenshotMode.seed(
+                    bikeManager: services.bikeManager,
+                    bikeService: services.bikeService,
+                    locationManager: services.locationManager,
+                    rideRecorder: services.rideRecorder,
+                    modelContext: Self.sharedModelContainer.mainContext
+                )
+            }
         }
 
         _bikeManager = StateObject(wrappedValue: services.bikeManager)
@@ -193,6 +202,7 @@ struct GiantLoggerApp: App {
                 .environmentObject(watchConnectivity)
                 .environmentObject(favoritePlacesManager)
                 .onChange(of: scenePhase) { _, newPhase in
+                    guard !ScreenshotMode.isEnabled else { return }
                     if newPhase == .active {
                         bikeManager.startForegroundAutoReconnectLoop()
                     } else if newPhase == .background {
