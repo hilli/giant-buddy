@@ -8,6 +8,7 @@
 - `task build:release` builds Release for `generic/platform=iOS`.
 - `task simulator` builds and launches the app in the iOS Simulator, defaulting to `platform=iOS Simulator,name=iPhone 17 Pro Max`; override with `SIM_DEST='platform=iOS Simulator,name=...'`.
 - `task deploy`, `task deploy:ota`, and `task deploy:release` build, install, and launch on a connected or paired iPhone.
+- `task testflight` archives Release and uploads it to App Store Connect via `ExportOptions-AppStore.plist`; Xcode bumps the build number on upload, so don't edit `CURRENT_PROJECT_VERSION` for TestFlight builds.
 - `task lint` runs `swiftlint lint --strict`; `task lint:fix` runs SwiftLint autocorrection.
 - `task format:check` runs `swiftformat GiantLogger/ --lint`; `task format` formats `GiantLogger/`.
 - `task setup` installs SwiftLint and SwiftFormat with Homebrew.
