@@ -1,20 +1,12 @@
 import WatchConnectivity
 import Combine
 
-struct WatchHeartRateSample: Sendable {
-    let timestamp: Date
-    let bpm: Double
-}
-
 private struct WatchHeartRateUpdate: Sendable {
-    let timestamp: Date
     let bpm: Double
     let activeCalories: Double?
 
     init?(_ payload: [String: Any]) {
         guard let bpm = payload["heartRate"] as? Double, bpm > 0 else { return nil }
-        let timestamp = payload["timestamp"] as? Double ?? Date().timeIntervalSince1970
-        self.timestamp = Date(timeIntervalSince1970: timestamp)
         self.bpm = bpm
         activeCalories = payload["activeCalories"] as? Double
     }
@@ -29,9 +21,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     private var session: WCSession?
     private var latestContext: [String: Any] = [:]
     private var lastTelemetryContextPush = Date.distantPast
-    private var recentHeartRateSamples: [WatchHeartRateSample] = []
     private let transientContextKeys: Set<String> = ["type", "hapticType", "hapticID"]
-    private let maxHeartRateSamples = 3_600
 
     // Heart rate from Watch
     @Published var heartRate: Double = 0
@@ -165,14 +155,6 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         }
     }
 
-    func heartRateSamples(since startDate: Date?, through endDate: Date) -> [WatchHeartRateSample] {
-        recentHeartRateSamples.filter { sample in
-            sample.bpm > 0
-                && sample.timestamp <= endDate
-                && startDate.map { sample.timestamp >= $0 } != false
-        }
-    }
-
     private func mergeAndSendContext(_ updates: [String: Any], forceApplicationContext: Bool) {
         guard let session else { return }
         if latestContext.isEmpty {
@@ -205,21 +187,8 @@ class WatchConnectivityManager: NSObject, ObservableObject {
 
     private func applyHeartRateUpdate(_ update: WatchHeartRateUpdate) {
         heartRate = update.bpm
-        appendHeartRateSample(timestamp: update.timestamp, bpm: update.bpm)
         if let calories = update.activeCalories {
             activeCalories = calories
-        }
-    }
-
-    private func appendHeartRateSample(timestamp: Date, bpm: Double) {
-        if recentHeartRateSamples.contains(where: {
-            abs($0.timestamp.timeIntervalSince(timestamp)) < 0.001 && $0.bpm == bpm
-        }) {
-            return
-        }
-        recentHeartRateSamples.append(WatchHeartRateSample(timestamp: timestamp, bpm: bpm))
-        if recentHeartRateSamples.count > maxHeartRateSamples {
-            recentHeartRateSamples.removeFirst(recentHeartRateSamples.count - maxHeartRateSamples)
         }
     }
 }

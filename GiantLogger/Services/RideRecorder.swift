@@ -47,6 +47,7 @@ class RideRecorder: ObservableObject {
     private var recordingStartDate: Date?
     private var movingSpeedSum: Double = 0
     private var movingSpeedCount: Int = 0
+    private var isSavingWorkouts = false
     private let watchConnectivity = WatchConnectivityManager.shared
     private let debugLog = DebugLogger.shared
     private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "Recorder")
@@ -82,6 +83,16 @@ class RideRecorder: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        // HealthKit is unavailable while the phone is locked; save rides that
+        // ended in a pocket once it unlocks (if the app is still running).
+        NotificationCenter.default
+            .publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { await self?.savePendingWorkouts() }
+            }
+            .store(in: &cancellables)
     }
 
     func startRecording() {
@@ -108,7 +119,6 @@ class RideRecorder: ObservableObject {
         movingSpeedCount = 0
 
         locationManager?.startTracking()
-        if logWorkouts { workoutManager?.startWorkout() }
         liveActivityManager.startActivity()
 
         debugLog.log("Recorder", "Recording started")
@@ -162,7 +172,6 @@ class RideRecorder: ObservableObject {
         isRecording = false
         heartRate = 0
         liveActivityManager.endActivity()
-        let stopDate = Date()
 
         let distKm = String(format: "%.2f", accumulatedDistance)
         debugLog.log("Recorder", "Recording stopped — \(sampleCount) samples, \(distKm) km")
@@ -182,6 +191,7 @@ class RideRecorder: ObservableObject {
         )
 
         // Discard rides with no samples, no meaningful movement, or no GPS data
+        var healthSaveDeferred = false
         if let ride = currentRide {
             ride.computeSummary()
             let samples = ride.samples ?? []
@@ -191,25 +201,8 @@ class RideRecorder: ObservableObject {
                 || !hasGPS
             if shouldDiscard {
                 debugLog.log("Recorder", "Discarding ride: \(samples.count) samples, \(String(format: "%.3f", accumulatedDistance)) km, gps=\(hasGPS)")
-                if logWorkouts { workoutManager?.discardWorkout() }
                 modelContext?.delete(ride)
             } else {
-                // Heart-rate + rider-power samples (captured now; recordingStartDate
-                // is cleared before the async finalize below runs).
-                let watchHRSamples = watchConnectivity
-                    .heartRateSamples(since: recordingStartDate, through: stopDate)
-                    .map { (timestamp: $0.timestamp, bpm: $0.bpm) }
-                let hrSamples = watchHRSamples.isEmpty
-                    ? (ride.samples ?? [])
-                        .filter { $0.heartRate > 0 }
-                        .map { (timestamp: $0.timestamp, bpm: $0.heartRate) }
-                    : watchHRSamples
-                // Average rider power (human pedalling effort)
-                let riderPowerSamples = (ride.samples ?? []).filter { $0.torque > 0 && $0.cadence > 0 }
-                let avgRiderPower = riderPowerSamples.isEmpty ? 0.0 :
-                    riderPowerSamples.map { $0.torque * $0.cadence * 0.10472 }.reduce(0, +)
-                        / Double(riderPowerSamples.count)
-
                 SharedBikeData.lastRideDate = ride.startDate
                 SharedBikeData.lastRideDistance = ride.totalDistance
                 SharedBikeData.lastRideDuration = TimeInterval(ride.duration)
@@ -217,15 +210,15 @@ class RideRecorder: ObservableObject {
                 SharedBikeData.lastRideElevationGain = ride.elevationGain
                 WidgetCenter.shared.reloadAllTimelines()
 
+                healthSaveDeferred = logWorkouts && !UIApplication.shared.isProtectedDataAvailable
+
                 // Resolve the ride name (planned route name when navigating, else a
                 // reverse-geocoded "Start → End"), then save the HealthKit workout
                 // titled with that name.
                 finalizeRide(
                     ride,
                     samples: samples,
-                    routeName: navigationEngine?.activeRoute?.name,
-                    heartRateSamples: hrSamples,
-                    avgRiderPower: avgRiderPower
+                    routeName: navigationEngine?.activeRoute?.name
                 )
             }
         }
@@ -234,9 +227,10 @@ class RideRecorder: ObservableObject {
         // Notify user if app is in background
         let distStr = String(format: "%.1f km", accumulatedDistance)
         let mins = elapsedSeconds / 60
+        let healthHint = healthSaveDeferred ? " Open Giant Buddy to save it to Apple Health." : ""
         postBackgroundNotification(
             title: "Ride Recording Stopped",
-            body: "Recorded \(distStr) in \(mins) min."
+            body: "Recorded \(distStr) in \(mins) min.\(healthHint)"
         )
 
         locationManager?.stopTracking()
@@ -304,11 +298,6 @@ class RideRecorder: ObservableObject {
         // Periodic save
         if sampleCount % 10 == 0 {
             try? modelContext.save()
-        }
-
-        // Feed GPS location to workout route builder
-        if logWorkouts, let location {
-            workoutManager?.addRouteLocation(location)
         }
 
         // Update turn-by-turn navigation with current position
@@ -394,6 +383,50 @@ extension RideRecorder {
     }
 }
 
+// MARK: - Apple Health
+
+extension RideRecorder {
+    /// Save rides waiting for Apple Health. HealthKit rejects writes while the
+    /// phone is locked, so rides that auto-stop in a pocket stay pending until
+    /// the phone unlocks or the app is opened. Failed saves stay pending and are
+    /// retried on the next trigger.
+    func savePendingWorkouts() async {
+        guard logWorkouts, !isSavingWorkouts, let modelContext, let workoutManager else { return }
+
+        let pending = HealthKitStatus.pending
+        let descriptor = FetchDescriptor<Ride>(
+            predicate: #Predicate { $0.healthKitStatus == pending },
+            sortBy: [SortDescriptor(\.startDate)]
+        )
+        guard let rides = try? modelContext.fetch(descriptor), !rides.isEmpty else { return }
+        guard UIApplication.shared.isProtectedDataAvailable else {
+            debugLog.log("HK", "Workout save deferred — \(rides.count) pending, phone locked")
+            return
+        }
+
+        isSavingWorkouts = true
+        defer { isSavingWorkouts = false }
+        var bgTaskID = UIBackgroundTaskIdentifier.invalid
+        bgTaskID = UIApplication.shared.beginBackgroundTask(withName: "save-workouts") {
+            UIApplication.shared.endBackgroundTask(bgTaskID)
+            bgTaskID = .invalid
+        }
+        defer {
+            if bgTaskID != .invalid { UIApplication.shared.endBackgroundTask(bgTaskID) }
+        }
+
+        for ride in rides {
+            do {
+                try await workoutManager.save(ride)
+                ride.healthKitStatus = HealthKitStatus.saved
+                try? modelContext.save()
+            } catch {
+                debugLog.log("HK", "Workout save FAILED for \(ride.name): \(error.localizedDescription) — will retry")
+            }
+        }
+    }
+}
+
 // MARK: - Ride Naming (Reverse Geocoding)
 
 extension RideRecorder {
@@ -405,9 +438,7 @@ extension RideRecorder {
     /// navigating; otherwise a reverse-geocoded "Start → End" name is computed.
     /// The workout/Strava activity is titled *after* the name resolves (HealthKit
     /// workout metadata is immutable once finished).
-    func finalizeRide(_ ride: Ride, samples: [RideSample], routeName: String?,
-                      heartRateSamples: [(timestamp: Date, bpm: Double)],
-                      avgRiderPower: Double) {
+    func finalizeRide(_ ride: Ride, samples: [RideSample], routeName: String?) {
         // Set fallback name immediately so the ride is never unnamed.
         ride.name = "Giant eBike Ride"
         try? modelContext?.save()
@@ -423,20 +454,13 @@ extension RideRecorder {
         Task { @MainActor in
             let title = await resolvedRideName(routeName: routeName, samples: samples)
             ride.name = title
+            if saveWorkout {
+                ride.healthKitStatus = HealthKitStatus.pending
+            }
             try? modelContext?.save()
             debugLog.log("Recorder", "Ride named: \(title)")
 
-            if saveWorkout {
-                workoutManager?.stopWorkout(
-                    title: title,
-                    distance: ride.totalDistance,
-                    elevationGain: ride.elevationGain,
-                    avgMotorPower: ride.avgPower,
-                    avgRiderPower: avgRiderPower,
-                    duration: TimeInterval(ride.duration),
-                    heartRateSamples: heartRateSamples
-                )
-            }
+            await savePendingWorkouts()
 
             // Auto-upload to Strava under the same background assertion so the
             // request survives app suspension (e.g. phone back in pocket after an
