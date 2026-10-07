@@ -51,6 +51,21 @@ tasks:
         -allowProvisioningUpdates
         -quiet
 
+  test:
+    desc: Run unit tests in the iOS Simulator
+    vars:
+      SIM_DEST: '{{.SIM_DEST | default "platform=iOS Simulator,name=iPhone 17 Pro Max"}}'
+    cmds:
+      - >-
+        xcodebuild
+        -project {{.PROJECT}}
+        -scheme {{.SCHEME}}
+        -configuration Debug
+        -destination '{{.SIM_DEST}}'
+        -only-testing:GiantLoggerTests
+        test
+        {{.CLI_ARGS}}
+
   simulator:
     desc: Build and run in iOS Simulator
     vars:

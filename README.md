@@ -92,6 +92,7 @@ This repository also includes a `Taskfile.yaml` with common workflows:
 
 - `task build:quiet` — build the iOS app in Debug
 - `task simulator` — build and launch in the iOS Simulator
+- `task test` — run the unit tests in the iOS Simulator (override the device with `SIM_DEST`)
 - `task deploy` — install and launch on a connected iPhone
 - `task testflight` — archive and upload to App Store Connect for TestFlight (build number is assigned by Xcode)
 - `task lint` — run SwiftLint (if installed)

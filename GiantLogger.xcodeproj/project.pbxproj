@@ -38,6 +38,13 @@
 			remoteGlobalIDString = 2F5419782F5F37FC00138852;
 			remoteInfo = GiantLoggetWatchWidgetsExtension;
 		};
+		TST000000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PRJ000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = TGT000000000000000000001;
+			remoteInfo = GiantLogger;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -83,6 +90,7 @@
 		2F12975D2F5DBFF5009FF090 /* GiantLogger Watch App Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "GiantLogger Watch App Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F5419792F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GiantLoggetWatchWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		APP00000000000000000001 /* GiantLogger.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GiantLogger.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		TST000000000000000000002 /* GiantLoggerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GiantLoggerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -136,6 +144,7 @@
 		2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F12976C2F5DBFF7009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "GiantLogger Watch App Watch App"; sourceTree = "<group>"; };
 		2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (2F54198C2F5F37FD00138852 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLoggetWatchWidgets; sourceTree = "<group>"; };
 		SRC000000000000000000001 /* GiantLogger */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (EXC000000000000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 2F1294F22F5D7BD0009FF090 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = GiantLogger; sourceTree = "<group>"; };
+		TST000000000000000000003 /* GiantLoggerTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = GiantLoggerTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -171,6 +180,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		TST000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -190,6 +206,7 @@
 				2F1294D52F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-iosExtension.appex */,
 				2F12975D2F5DBFF5009FF090 /* GiantLogger Watch App Watch App.app */,
 				2F5419792F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension.appex */,
+				TST000000000000000000002 /* GiantLoggerTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -201,6 +218,7 @@
 				2F1294DB2F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-ios */,
 				2F12975E2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */,
 				2F54197C2F5F37FC00138852 /* GiantLoggetWatchWidgets */,
+				TST000000000000000000003 /* GiantLoggerTests */,
 				2F1294D62F5D7B29009FF090 /* Frameworks */,
 				PRD000000000000000000001 /* Products */,
 			);
@@ -303,6 +321,29 @@
 			productReference = APP00000000000000000001 /* GiantLogger.app */;
 			productType = "com.apple.product-type.application";
 		};
+		TST000000000000000000001 /* GiantLoggerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TST000000000000000000011 /* Build configuration list for PBXNativeTarget "GiantLoggerTests" */;
+			buildPhases = (
+				TST000000000000000000004 /* Sources */,
+				TST000000000000000000005 /* Frameworks */,
+				TST000000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TST000000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				TST000000000000000000003 /* GiantLoggerTests */,
+			);
+			name = GiantLoggerTests;
+			packageProductDependencies = (
+			);
+			productName = GiantLoggerTests;
+			productReference = TST000000000000000000002 /* GiantLoggerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -325,6 +366,10 @@
 					TGT000000000000000000001 = {
 						CreatedOnToolsVersion = 16.2;
 					};
+					TST000000000000000000001 = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = TGT000000000000000000001;
+					};
 				};
 			};
 			buildConfigurationList = BCL000000000000000000001 /* Build configuration list for PBXProject "GiantLogger" */;
@@ -344,6 +389,7 @@
 				2F1294D42F5D7B29009FF090 /* dk.hilli.GiantLogger.widget-iosExtension */,
 				2F12975C2F5DBFF5009FF090 /* GiantLogger Watch App Watch App */,
 				2F5419782F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension */,
+				TST000000000000000000001 /* GiantLoggerTests */,
 			);
 		};
 /* End PBXProject section */
@@ -371,6 +417,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		RES000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TST000000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -408,6 +461,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		TST000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -425,6 +485,11 @@
 			isa = PBXTargetDependency;
 			target = 2F5419782F5F37FC00138852 /* GiantLoggetWatchWidgetsExtension */;
 			targetProxy = 2F5419862F5F37FD00138852 /* PBXContainerItemProxy */;
+		};
+		TST000000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = TGT000000000000000000001 /* GiantLogger */;
+			targetProxy = TST000000000000000000007 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -850,6 +915,42 @@
 			};
 			name = Release;
 		};
+		TST000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7NLS34A7F5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dk.hilli.GiantLoggerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GiantLogger.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GiantLogger";
+			};
+			name = Debug;
+		};
+		TST000000000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7NLS34A7F5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dk.hilli.GiantLoggerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GiantLogger.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GiantLogger";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -894,6 +995,15 @@
 			buildConfigurations = (
 				DEB000000000000000000002 /* Debug */,
 				REL000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		TST000000000000000000011 /* Build configuration list for PBXNativeTarget "GiantLoggerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TST000000000000000000009 /* Debug */,
+				TST000000000000000000010 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
