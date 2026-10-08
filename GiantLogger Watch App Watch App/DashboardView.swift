@@ -2,17 +2,27 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var session: WatchSessionManager
+    @State private var selectedTab = Self.initialTab
 
     var body: some View {
         NavigationStack {
-            TabView {
-                metricsTab
-                navigationTab
-                controlTab
-                bikeInfoTab
+            TabView(selection: $selectedTab) {
+                metricsTab.tag(0)
+                navigationTab.tag(1)
+                controlTab.tag(2)
+                bikeInfoTab.tag(3)
             }
             .tabViewStyle(.verticalPage)
         }
+    }
+
+    /// Starting tab; overridable in debug builds with `-ScreenshotTab N` for screenshots.
+    private static var initialTab: Int {
+        #if DEBUG
+            UserDefaults.standard.integer(forKey: "ScreenshotTab")
+        #else
+            0
+        #endif
     }
 
     // MARK: - Metrics Tab

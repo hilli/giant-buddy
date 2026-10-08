@@ -48,6 +48,9 @@ class WatchSessionManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        #if DEBUG
+            if seedScreenshotDataIfRequested() { return }
+        #endif
         if WCSession.isSupported() {
             session = WCSession.default
             session?.delegate = self

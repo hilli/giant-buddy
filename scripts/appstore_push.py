@@ -7,7 +7,7 @@
 Reads docs/appstore/ and updates the editable app info (name, subtitle,
 privacy URL, categories), the iOS App Store version (copyright), its en-US
 localization (description, keywords, promotional text, support URL),
-App Review details and the iPhone 6.9" screenshots.
+App Review details and the iPhone 6.9" and Apple Watch Ultra screenshots.
 
 Credentials (never commit the .p8):
   ASC_ISSUER_ID  Issuer ID (App Store Connect > Users and Access > Integrations)
@@ -35,12 +35,15 @@ import requests
 BASE_URL = "https://api.appstoreconnect.apple.com"
 BUNDLE_ID = "dk.hilli.GiantLogger"
 LOCALE = "en-US"
-DISPLAY_TYPE = "APP_IPHONE_67"  # 6.9" iPhone slot; accepts 1320x2868
-
 ROOT = Path(__file__).resolve().parent.parent
 APPSTORE_DIR = ROOT / "docs" / "appstore"
 METADATA_DIR = APPSTORE_DIR / "metadata" / LOCALE
-SCREENSHOT_DIR = APPSTORE_DIR / "screenshots" / "iphone"
+SCREENSHOT_DIR = APPSTORE_DIR / "screenshots"
+# Screenshot folder -> App Store Connect display type
+SCREENSHOT_SETS = {
+    "iphone": "APP_IPHONE_67",  # 6.9" iPhone slot; accepts 1320x2868
+    "watch": "APP_WATCH_ULTRA",  # Apple Watch Ultra slot; accepts 422x514
+}
 REVIEW_CONTACT = APPSTORE_DIR / "review_contact.local.json"
 
 METADATA_FIELDS = (
@@ -299,31 +302,40 @@ def upload_screenshot(api: ASC, set_id: str, path: Path) -> None:
     print(f"    {path.name}: still processing, check App Store Connect")
 
 
-def push_screenshots(api: ASC, localization_id: str) -> None:
-    files = sorted(SCREENSHOT_DIR.glob("*.png"))
+def push_screenshot_set(api: ASC, localization_id: str, sets: list[dict], folder: str, display_type: str) -> None:
+    files = sorted((SCREENSHOT_DIR / folder).glob("*.png"))
     if not files:
-        print("  screenshots: none found, skipped")
+        print(f"  {folder} screenshots: none found, skipped")
         return
-    sets = api.get(f"/v1/appStoreVersionLocalizations/{localization_id}/appScreenshotSets")["data"]
-    shot_set = next((s for s in sets if s["attributes"]["screenshotDisplayType"] == DISPLAY_TYPE), None)
+    shot_set = next((s for s in sets if s["attributes"]["screenshotDisplayType"] == display_type), None)
     if shot_set is None:
         shot_set = api.create(
             "appScreenshotSets",
-            {"screenshotDisplayType": DISPLAY_TYPE},
+            {"screenshotDisplayType": display_type},
             {"appStoreVersionLocalization": rel("appStoreVersionLocalizations", localization_id)},
         )
         if shot_set is None:
-            print(f"  screenshots: would upload {len(files)} to a new {DISPLAY_TYPE} set")
+            print(f"  {folder} screenshots: would upload {len(files)} to a new {display_type} set")
             return
     else:
         existing = api.get(f"/v1/appScreenshotSets/{shot_set['id']}/appScreenshots")["data"]
+        local = [hashlib.md5(path.read_bytes()).hexdigest() for path in files]
+        if [shot["attributes"].get("sourceFileChecksum") for shot in existing] == local:
+            print(f"  {folder} screenshots: unchanged")
+            return
         if existing:
-            print(f"  screenshots: removing {len(existing)} existing")
+            print(f"  {folder} screenshots: removing {len(existing)} existing")
         for shot in existing:
             api.request("DELETE", f"/v1/appScreenshots/{shot['id']}")
     for path in files:
-        print(f"  screenshot: {path.name}")
+        print(f"  {folder} screenshot: {path.name}")
         upload_screenshot(api, shot_set["id"], path)
+
+
+def push_screenshots(api: ASC, localization_id: str) -> None:
+    sets = api.get(f"/v1/appStoreVersionLocalizations/{localization_id}/appScreenshotSets")["data"]
+    for folder, display_type in SCREENSHOT_SETS.items():
+        push_screenshot_set(api, localization_id, sets, folder, display_type)
 
 
 def main() -> None:
