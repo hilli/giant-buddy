@@ -59,11 +59,11 @@ followed by `xcrun simctl io <udid> screenshot <file>.png`.
 - [x] **Apple Watch**: App Store Connect requires watch screenshots because the watch app ships inside the iOS build. They are pushed from `screenshots/watch/`.
 - [x] **Draft submission**: version 1.0 has been added to the draft review submission.
 
-To attach a build and add the version to a draft submission again, for example after you delete the draft or upload a new build:
+To attach a build and add the version to a draft submission again, for example after you delete the draft or upload a new build, set the `ASC_*` variables shown above and run:
 
 ```sh
-uv run scripts/appstore_push.py --skip-screenshots --add-to-draft            # keeps the attached build, or picks the latest valid one
-uv run scripts/appstore_push.py --skip-screenshots --add-to-draft --build 4  # attaches a specific build number
+task appstore:push -- --skip-screenshots --add-to-draft            # keeps the attached build, or picks the latest valid one
+task appstore:push -- --skip-screenshots --add-to-draft --build 4  # attaches a specific build number
 ```
 
 The command is safe to re-run. It reuses an existing draft and never submits for review. Add `--dry-run` to preview the changes.
