@@ -10,7 +10,7 @@ struct ContentView: View {
     @EnvironmentObject var stravaService: StravaService
     @EnvironmentObject var navigationEngine: NavigationEngine
     @State private var showSearch = false
-    @State private var selectedTab = 0
+    @State private var selectedTab = ScreenshotMode.initialTab
     @State private var gpxImportMessage: String?
     @State private var showGPXImportAlert = false
     @AppStorage("crashDetectionEnabled") private var crashDetectionEnabled = false

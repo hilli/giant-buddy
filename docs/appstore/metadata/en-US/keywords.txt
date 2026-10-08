@@ -1,0 +1,1 @@
+ebike,e-bike,cycling,bike computer,ride,gps,bluetooth,navigation,battery,range,strava,heart rate

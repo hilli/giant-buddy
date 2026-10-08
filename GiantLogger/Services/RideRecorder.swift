@@ -358,6 +358,7 @@ extension RideRecorder {
 
     /// Request notification permission (called once during configure).
     func requestNotificationPermission() {
+        guard !ScreenshotMode.isEnabled else { return }
         UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }

@@ -1,0 +1,34 @@
+Giant Buddy connects to Giant e-bikes with RideControl+ over Bluetooth and turns your iPhone and Apple Watch into a ride computer, navigator and bike-health dashboard.
+
+LIVE RIDE DASHBOARD
+See everything at a glance while you ride: speed, cadence, torque, motor power, estimated rider power, battery level, remaining range, distance and time. A live map shows your position and trail, alongside current weather and heart rate from your Apple Watch. A landscape layout keeps the key numbers visible with your phone on the handlebars. On supported bikes you can also toggle the light and change the assist level from the app.
+
+ROUTES AND NAVIGATION
+Import GPX routes, draw new routes on the map, or search for a destination by address or place name. Point-of-interest shortcuts find cafés, bike shops and charging stations, and favorite places are one tap away. Preview every route with distance, elevation profile, estimated time and a battery-range prediction based on your past rides.
+
+While navigating you get turn-by-turn guidance, remaining distance and progress along the route. Go off-route and Giant Buddy notices and reroutes. Optional voice prompts and haptics keep you informed without looking at the screen.
+
+RIDE RECORDING AND HISTORY
+Record GPS tracks together with full bike telemetry in the background, even with your phone in your pocket. With auto-record on, recording starts as soon as the bike connects. Rides are named from their start and end locations, so your history reads "Aarhus → Skanderborg" instead of a timestamp. Open any ride for interactive charts of speed, motor power, rider power, elevation and battery, and scrub the timeline to inspect any moment.
+
+Export rides as CSV or GPX, upload directly to Strava, or save a ride as a reusable route. Open .gpx files from Files, Safari, Mail or AirDrop to import them as routes.
+
+ANALYTICS
+Follow your riding trends by week, month, year or all time: total distance, ride count, average speed, elevation gain, energy used in watt-hours, efficiency and personal records.
+
+BIKE INFO AND MAINTENANCE
+View frame number, odometer and firmware versions. Track battery charge, health, capacity and charge cycles over time. Set maintenance reminders by distance or date, and review the bike's error log.
+
+SAFETY
+Turn on crash detection for your rides. If a crash is detected, Giant Buddy shows a full-screen countdown. If you don't dismiss it, the app prepares a text message with your GPS location to your emergency contacts, ready for you to send.
+
+APPLE WATCH, WIDGETS AND HEALTH
+The Apple Watch app shows live ride data and navigation on your wrist, lets you start and stop recording, and shares your heart rate with the iPhone. Watch complications, Home Screen and Lock Screen widgets, and Live Activities in the Dynamic Island keep your ride in view. Rides can be saved as cycling workouts in Apple Health, and your rides and routes sync between devices with iCloud.
+
+PRIVATE AND OPEN SOURCE
+No account, no ads and no tracking. Your rides stay on your devices and in your own iCloud. Giant Buddy is open source under the MIT licence.
+
+COMPATIBILITY
+Requires a Giant e-bike with RideControl+ Bluetooth. Tested with the Giant Stormguard E+ 2 (2023). Requires iOS 26 or later; Apple Watch features require watchOS 26 or later.
+
+Giant Buddy is an independent app. It is not affiliated with, endorsed by or sponsored by Giant Manufacturing Co., Ltd. Giant and RideControl are trademarks of their respective owners.

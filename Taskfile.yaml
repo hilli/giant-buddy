@@ -71,6 +71,47 @@ tasks:
       - >-
         xcrun simctl launch booted {{.BUNDLE_ID}}
 
+  appstore:screenshots:
+    desc: Capture App Store screenshots in the Simulator using demo data (ScreenshotMode)
+    vars:
+      SIM_NAME: '{{.SIM_NAME | default "iPhone 17 Pro Max"}}'
+      OUT_DIR: docs/appstore/screenshots/iphone
+    cmds:
+      - |
+        set -euo pipefail
+        UDID=$(xcrun simctl list devices available | grep "{{.SIM_NAME}} (" | head -1 | grep -oE '[0-9A-F-]{36}')
+        test -n "$UDID" || { echo "Simulator '{{.SIM_NAME}}' not found"; exit 1; }
+        xcrun simctl boot "$UDID" 2>/dev/null || true
+        xcrun simctl bootstatus "$UDID" -b
+        open -a Simulator
+        xcodebuild -project {{.PROJECT}} -scheme {{.SCHEME}} -configuration Debug \
+          -destination "id=$UDID" -derivedDataPath build/DerivedData -quiet build
+        xcrun simctl install "$UDID" build/DerivedData/Build/Products/Debug-iphonesimulator/{{.SCHEME}}.app
+        xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
+          --cellularBars 4 --wifiBars 3 --dataNetwork wifi
+        xcrun simctl location "$UDID" set 55.6761,12.5683
+        xcrun simctl privacy "$UDID" grant location-always {{.BUNDLE_ID}} || true
+        mkdir -p {{.OUT_DIR}}
+        i=0
+        for name in 01-ride 02-routes 03-history 04-bike 05-settings; do
+          xcrun simctl terminate "$UDID" {{.BUNDLE_ID}} 2>/dev/null || true
+          xcrun simctl launch "$UDID" {{.BUNDLE_ID}} -ScreenshotMode YES -autoRecord NO \
+            -autoConnectEnabled NO -ScreenshotTab "$i" -AppleLanguages "(en)" -AppleLocale en_GB
+          sleep 10
+          xcrun simctl io "$UDID" screenshot "{{.OUT_DIR}}/$name.png"
+          i=$((i + 1))
+        done
+        xcrun simctl terminate "$UDID" {{.BUNDLE_ID}} 2>/dev/null || true
+        xcrun simctl status_bar "$UDID" clear
+
+  appstore:push:
+    desc: Push App Store metadata + screenshots via App Store Connect API (pass -- --dry-run to preview)
+    preconditions:
+      - sh: command -v uv
+        msg: "uv not found. Install with: brew install uv (or mise use uv)"
+    cmds:
+      - uv run scripts/appstore_push.py {{.CLI_ARGS}}
+
   clean:
     desc: Clean build artifacts
     cmds:
