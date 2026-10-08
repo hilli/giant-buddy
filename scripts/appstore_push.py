@@ -17,6 +17,11 @@ Credentials (never commit the .p8):
 Usage:
   uv run scripts/appstore_push.py --dry-run
   uv run scripts/appstore_push.py
+  uv run scripts/appstore_push.py --skip-screenshots --add-to-draft [--build 3]
+
+--add-to-draft attaches a valid build to the version and puts it in a draft
+review submission. It never submits; press "Submit for Review" in App Store
+Connect yourself.
 """
 
 from __future__ import annotations
@@ -71,6 +76,7 @@ LIMITS = {
 REQUIRED = ("name", "description", "keywords", "support_url", "privacy_url")
 EDITABLE_STATES = {
     "PREPARE_FOR_SUBMISSION",
+    "READY_FOR_REVIEW",  # in a draft review submission, still editable
     "DEVELOPER_REJECTED",
     "REJECTED",
     "METADATA_REJECTED",
@@ -338,11 +344,77 @@ def push_screenshots(api: ASC, localization_id: str) -> None:
         push_screenshot_set(api, localization_id, sets, folder, display_type)
 
 
+def attach_build(api: ASC, app_id: str, version_id: str, version: str, build_number: str | None) -> bool:
+    current = api.get(f"/v1/appStoreVersions/{version_id}/build").get("data")
+    params = {
+        "filter[app]": app_id,
+        "filter[preReleaseVersion.version]": version,
+        "filter[preReleaseVersion.platform]": "IOS",
+        "filter[processingState]": "VALID",
+        "filter[expired]": "false",
+        "sort": "-uploadedDate",
+        "limit": "1",
+    }
+    if build_number:
+        params["filter[version]"] = build_number
+    elif current:
+        print(f"  build: {current['attributes']['version']} already attached")
+        return True
+    builds = api.get("/v1/builds", **params)["data"]
+    if not builds:
+        print(f"  build: no valid {version} build {build_number or ''} found; upload one with `task testflight`")
+        return False
+    build = builds[0]
+    if current and current["id"] == build["id"]:
+        print(f"  build: {build['attributes']['version']} already attached")
+        return True
+    print(f"  build: attaching {build['attributes']['version']}")
+    api.request("PATCH", f"/v1/appStoreVersions/{version_id}/relationships/build", body=rel("builds", build["id"]))
+    return True
+
+
+def add_to_draft_submission(api: ASC, app_id: str, version_id: str) -> None:
+    """Put the version in a draft review submission. Never submits it."""
+    submissions = api.get(
+        "/v1/reviewSubmissions",
+        **{"filter[app]": app_id, "filter[platform]": "IOS", "limit": "50"},
+    )["data"]
+    active = [s for s in submissions if state_of(s) not in {"READY_FOR_REVIEW", "COMPLETE", "CANCELING"}]
+    if active:
+        print(f"  submission: {active[0]['id']} is {state_of(active[0])}; nothing to do")
+        return
+    draft = next((s for s in submissions if state_of(s) == "READY_FOR_REVIEW"), None)
+    if draft is None:
+        print("  submission: creating draft")
+        draft = api.create("reviewSubmissions", {"platform": "IOS"}, {"app": rel("apps", app_id)})
+        if draft is None:
+            print("  submission: would add the version to the new draft")
+            return
+    else:
+        items = api.get(f"/v1/reviewSubmissions/{draft['id']}/items", include="appStoreVersion")["data"]
+        linked = [(i["relationships"].get("appStoreVersion") or {}).get("data") or {} for i in items]
+        if any(v.get("id") == version_id for v in linked):
+            print(f"  submission: version already in draft {draft['id']}")
+            return
+    print(f"  submission: adding version to draft {draft['id']}")
+    api.create(
+        "reviewSubmissionItems",
+        {},
+        {"reviewSubmission": rel("reviewSubmissions", draft["id"]), "appStoreVersion": rel("appStoreVersions", version_id)},
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dry-run", action="store_true", help="read from App Store Connect but change nothing")
     parser.add_argument("--version", default="1.0", help="App Store version string (default: 1.0)")
     parser.add_argument("--skip-screenshots", action="store_true", help="leave screenshots untouched")
+    parser.add_argument(
+        "--add-to-draft",
+        action="store_true",
+        help="attach a build and add the version to a draft review submission (never submits)",
+    )
+    parser.add_argument("--build", help="build number to attach with --add-to-draft (default: keep or latest valid)")
     args = parser.parse_args()
 
     meta = load_metadata()
@@ -371,6 +443,8 @@ def main() -> None:
         push_review_details(api, version_id, meta, contact)
         if localization_id and not args.skip_screenshots:
             push_screenshots(api, localization_id)
+        if args.add_to_draft and attach_build(api, app["id"], version_id, args.version, args.build):
+            add_to_draft_submission(api, app["id"], version_id)
     except ASCError as err:
         raise SystemExit(f"App Store Connect API error: {err}") from None
     print("Done" + (" (dry run, nothing changed)" if args.dry_run else ""))
