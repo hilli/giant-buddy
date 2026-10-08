@@ -789,7 +789,7 @@
 				INFOPLIST_FILE = GiantLogger/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Buddy needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Giant Buddy needs access to your contacts to set up emergency contacts for crash detection.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Giant Buddy reads workout data to display your cycling history.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy saves your cycling workouts to Apple Health so they appear in Fitness.";
@@ -888,7 +888,7 @@
 				INFOPLIST_FILE = GiantLogger/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Giant Buddy";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Logger needs Bluetooth to communicate with your Giant e-bike via BLE.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Giant Buddy needs Bluetooth to communicate with your Giant e-bike via BLE.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Giant Buddy needs access to your contacts to set up emergency contacts for crash detection.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Giant Buddy reads workout data to display your cycling history.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Giant Buddy saves your cycling workouts to Apple Health so they appear in Fitness.";
