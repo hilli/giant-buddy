@@ -1,4 +1,4 @@
-Giant Buddy is an independent ride computer for Giant e-bikes with RideControl+ Bluetooth. Attached: GiantBuddy-App-Review.mp4 (screen recording). Sample files from that ride, ride_2026-10-09.gpx and ride_2026-10-09.csv, are attached to our Resolution Center reply.
+Giant Buddy is an independent ride computer for Giant e-bikes with RideControl+ Bluetooth. Attached: GiantBuddy-App-Review.mp4 (screen recording). Sample files from that ride (GPX and CSV) are in ride_2026-10-09.zip, attached to our Resolution Center reply.
 
 1. SCREEN RECORDING
 Recorded on an iPhone 18 Pro Max running iOS 27, connected to a real e-bike (Giant Stormguard E+ 2, 2023). It starts on the Home Screen, launches the app and shows the main flow: connecting to the bike, the live ride dashboard and automatic recording, A-to-B turn-by-turn navigation, ride history with charts, export and Strava upload, saved routes, place search, bike status and a crash detection test. The app has no account creation, login, account deletion, user-generated content or in-app purchases.
@@ -11,7 +11,7 @@ For owners of Giant e-bikes with RideControl+. The bike's own display shows litt
 - Live data needs a compatible Giant e-bike: Bike tab > Scan for Bikes, then tap the bike. Recording starts automatically when connected (Settings > Auto-Record on Connect).
 - Without a bike:
   - Ride tab > magnifier: search a place or category (e.g. Bicycle Repair) and tap Navigate.
-  - My Routes > + > Import GPX: import the attached ride_2026-10-09.gpx (save it to Files first), or Create Route.
+  - My Routes > + > Import GPX: import ride_2026-10-09.gpx from the attached zip (save the zip to Files and tap it to unzip), or Create Route.
   - History, Settings and the Apple Watch app.
 - Crash detection test: Settings > Emergency Contacts & Crash Detection > Test Crash Alert. It shows the countdown only and sends nothing.
 - Strava upload is optional and uses Strava's own OAuth sign-in (any Strava account).
