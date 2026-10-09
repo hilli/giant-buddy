@@ -4,7 +4,7 @@ Giant Buddy is an independent ride computer for Giant e-bikes with RideControl+ 
 Recorded on an iPhone 18 Pro Max running iOS 27, connected to a real e-bike (Giant Stormguard E+ 2, 2023). It starts on the Home Screen, launches the app and shows the main flow: connecting to the bike, the live ride dashboard and automatic recording, A-to-B turn-by-turn navigation, ride history with charts, export and Strava upload, saved routes, place search, bike status and a crash detection test. The app has no account creation, login, account deletion, user-generated content or in-app purchases.
 
 2. PURPOSE AND AUDIENCE
-For owners of Giant e-bikes with RideControl+. The bike's own display shows little and keeps no history. Giant Buddy turns iPhone and Apple Watch into a ride computer: live speed, motor and rider power, cadence, torque and battery; automatic ride recording; cycling navigation with a battery prediction for the route; ride analysis and export; and bike health (odometer, battery, maintenance).
+For owners of Giant e-bikes with RideControl+. The bike's own display shows little and keeps no history. Giant Buddy turns iPhone and Apple Watch into a ride computer: live speed, motor and rider power, cadence, torque and battery; automatic ride recording even without getting the phone out of your pocket; cycling navigation with a battery prediction for the route; ride analysis and export; and bike health (odometer, battery, maintenance).
 
 3. SETUP
 - No account or login; no credentials are needed.
@@ -20,7 +20,7 @@ For owners of Giant e-bikes with RideControl+. The bike's own display shows litt
 - Apple MapKit: maps, place search, directions.
 - Apple WeatherKit: current weather and forecast.
 - Apple CloudKit: syncs rides and routes to the user's private iCloud database.
-- Apple HealthKit (optional): saves cycling workouts.
+- Apple HealthKit (optional): saves cycling workouts while excluding the energy the e-bike has put into the effort.
 - WatchConnectivity: iPhone to Apple Watch app.
 - Open-Meteo Elevation API (api.open-meteo.com): elevation for coordinates; no account, no personal identifiers.
 - Strava API (optional): OAuth sign-in and upload of rides the user chooses.
