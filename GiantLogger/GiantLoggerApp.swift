@@ -205,6 +205,7 @@ struct GiantLoggerApp: App {
                     guard !ScreenshotMode.isEnabled else { return }
                     if newPhase == .active {
                         bikeManager.startForegroundAutoReconnectLoop()
+                        Task { await rideRecorder.savePendingWorkouts() }
                     } else if newPhase == .background {
                         bikeManager.stopForegroundAutoReconnectLoop()
                         bikeManager.ensurePendingConnect()

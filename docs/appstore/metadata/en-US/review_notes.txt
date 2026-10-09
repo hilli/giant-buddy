@@ -1,11 +1,35 @@
-Giant Buddy is an independent ride computer for Giant e-bikes that use the RideControl / GEV Bluetooth LE protocol. A compatible e-bike is required to see live telemetry, so we have recorded a demo of the app connected to a real bike (Giant Stormguard E+ 2, 2023):
+Giant Buddy is an independent ride computer for Giant e-bikes with RideControl+ Bluetooth. Attached: GiantBuddy-App-Review.mp4 (screen recording). Sample files from that ride (GPX and CSV) are in ride_2026-10-09.zip, attached to our Resolution Center reply.
 
-https://youtube.com/shorts/R4iE35moApc
+1. SCREEN RECORDING
+Recorded on an iPhone 18 Pro Max running iOS 27, connected to a real e-bike (Giant Stormguard E+ 2, 2023). It starts on the Home Screen, launches the app and shows the main flow: connecting to the bike, the live ride dashboard and automatic recording, A-to-B turn-by-turn navigation, ride history with charts, export and Strava upload, saved routes, place search, bike status and a crash detection test. The app has no account creation, login, account deletion, user-generated content or in-app purchases.
 
-Notes for review:
-- No account or login is required. All data stays on the device and in the user's private iCloud (CloudKit).
-- Without a bike, you can still explore: Routes (import a GPX file or plan an A to B route), navigation preview, ride history, Settings, and the Apple Watch app.
-- Strava upload is optional and uses Strava's own OAuth sign-in.
-- Crash detection never sends anything automatically. It opens the standard Messages composer prefilled with the location, and the user must tap Send.
-- Bluetooth is used only to talk to the user's e-bike. Location is used for ride recording and navigation, including in the background during an active ride.
-- HealthKit is used to save cycling workouts when the user enables it.
+2. PURPOSE AND AUDIENCE
+For owners of Giant e-bikes with RideControl+. The bike's own display shows little and keeps no history. Giant Buddy turns iPhone and Apple Watch into a ride computer: live speed, motor and rider power, cadence, torque and battery; automatic ride recording even without getting the phone out of your pocket; cycling navigation with a battery prediction for the route; ride analysis and export; and bike health (odometer, battery, maintenance).
+
+3. SETUP
+- No account or login; no credentials are needed.
+- Live data needs a compatible Giant e-bike: Bike tab > Scan for Bikes, then tap the bike. Recording starts automatically when connected (Settings > Auto-Record on Connect).
+- Without a bike:
+  - Ride tab > magnifier: search a place or category (e.g. Bicycle Repair) and tap Navigate.
+  - My Routes > + > Import GPX: import ride_2026-10-09.gpx from the attached zip (save the zip to Files and tap it to unzip), or Create Route.
+  - History, Settings and the Apple Watch app.
+- Crash detection test: Settings > Emergency Contacts & Crash Detection > Test Crash Alert. It shows the countdown only and sends nothing.
+- Strava upload is optional and uses Strava's own OAuth sign-in (any Strava account).
+
+4. EXTERNAL SERVICES
+- Apple MapKit: maps, place search, directions.
+- Apple WeatherKit: current weather and forecast.
+- Apple CloudKit: syncs rides and routes to the user's private iCloud database.
+- Apple HealthKit (optional): saves cycling workouts while excluding the energy the e-bike has put into the effort.
+- WatchConnectivity: iPhone to Apple Watch app.
+- Open-Meteo Elevation API (api.open-meteo.com): elevation for coordinates; no account, no personal identifiers.
+- Strava API (optional): OAuth sign-in and upload of rides the user chooses.
+- Messages: if a crash countdown isn't dismissed, the app opens the Messages composer prefilled with the location; the user must tap Send. Nothing is sent automatically.
+- Bluetooth LE: only to the user's own e-bike.
+There is no developer server, analytics, advertising or tracking.
+
+5. REGIONS
+The app works the same in all regions. Map, search, directions and weather coverage follow Apple's services in each country.
+
+6. THIRD-PARTY MATERIAL
+Giant Buddy is an independent, open-source app (MIT licence, https://github.com/hilli/giant-buddy). It is not affiliated with, endorsed by or sponsored by Giant Manufacturing Co., Ltd. "Giant" is used only to describe which bikes the app works with, and the App Store description includes this disclaimer. The app contains no Giant logos, artwork, software or other copyrighted material; it talks to the rider's own bike over Bluetooth. No regulated content is involved. Crash detection is a convenience feature, not an emergency service.

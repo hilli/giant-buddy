@@ -23,6 +23,9 @@ final class Ride {
     var startBattery: Int = 0         // %
     var endBattery: Int = 0           // %
 
+    /// Apple Health export state; see `HealthKitStatus`.
+    var healthKitStatus: String = HealthKitStatus.none
+
     @Relationship(deleteRule: .cascade, inverse: \RideSample.ride)
     var samples: [RideSample]? = []
 
@@ -69,6 +72,23 @@ final class Ride {
             elevationGain = gain
         }
     }
+
+    /// Average human pedalling power (W): torque × cadence × 2π/60.
+    var avgRiderPower: Double {
+        let pedalling = (samples ?? []).filter { $0.torque > 0 && $0.cadence > 0 }
+        guard !pedalling.isEmpty else { return 0 }
+        return pedalling.map { $0.torque * $0.cadence * 0.10472 }.reduce(0, +) / Double(pedalling.count)
+    }
+}
+
+/// Values for `Ride.healthKitStatus`. Rides are saved to Apple Health after the
+/// fact because HealthKit is unavailable while the phone is locked.
+enum HealthKitStatus {
+    /// Not exported (logging disabled, or recorded before deferred saving).
+    static let none = "none"
+    /// Waiting to be saved once protected data is available.
+    static let pending = "pending"
+    static let saved = "saved"
 }
 
 @Model

@@ -1,45 +1,29 @@
 import Foundation
 import HealthKit
 import CoreLocation
-import os
-import UIKit
 
-// swiftlint:disable file_length
+enum WorkoutSaveError: LocalizedError {
+    case healthDataUnavailable
+    case finishReturnedNil
 
-@MainActor
-private final class BackgroundTaskHandle {
-    private var identifier: UIBackgroundTaskIdentifier = .invalid
-    private let debugLog: DebugLogger
-
-    init(name: String, debugLog: DebugLogger) {
-        self.debugLog = debugLog
-        identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
-            Task { @MainActor in
-                self?.debugLog.log("HK", "WARN: background task expired while saving workout")
-                self?.end()
-            }
+    var errorDescription: String? {
+        switch self {
+        case .healthDataUnavailable: "HealthKit is not available on this device"
+        case .finishReturnedNil: "finishWorkout returned no workout"
         }
-    }
-
-    func end() {
-        guard identifier != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(identifier)
-        identifier = .invalid
     }
 }
 
-/// Manages HealthKit workout lifecycle for outdoor cycling activities.
+/// Saves recorded rides to HealthKit as outdoor cycling workouts.
+///
+/// Workouts are built after the ride ends from the persisted `Ride`, because
+/// HealthKit rejects writes while the phone is locked (pocket-mode auto-stop).
 @MainActor
-// swiftlint:disable:next type_body_length
 class WorkoutManager: ObservableObject {
 
     @Published var isAuthorized = false
 
     private let healthStore = HKHealthStore()
-    private var workoutBuilder: HKWorkoutBuilder?
-    private var routeBuilder: HKWorkoutRouteBuilder?
-    private var workoutStartDate: Date?
-    private let logger = Logger(subsystem: "dk.hilli.GiantLogger", category: "Workout")
     private let debugLog = DebugLogger.shared
 
     /// Types we need to write to HealthKit.
@@ -84,353 +68,123 @@ class WorkoutManager: ObservableObject {
         }
     }
 
-    /// Whether we currently hold write authorization for workouts.
-    private func workoutSharingAuthorized() -> Bool {
-        healthStore.authorizationStatus(for: HKObjectType.workoutType()) == .sharingAuthorized
-    }
+    /// Save a finished ride as an outdoor cycling workout with distance, energy,
+    /// heart rate and GPS route. Throws without saving anything if a step before
+    /// `finishWorkout` fails, so the caller can retry later. The ride ID is the
+    /// sync identifier, so a retry after an unrecorded success is a no-op.
+    func save(_ ride: Ride) async throws {
+        guard HKHealthStore.isHealthDataAvailable() else { throw WorkoutSaveError.healthDataUnavailable }
 
-    /// Re-acquire a valid HealthKit authorization assertion before a save.
-    /// iOS 26/27 betas intermittently drop the privacy-service assertion
-    /// ("Unable to acquire legacy assertion on com.apple.HealthPrivacyService"),
-    /// which surfaces as "Authorization is not determined" and a nil finishWorkout.
-    /// Re-requesting re-establishes the assertion without re-prompting when the
-    /// user has already made a choice.
-    @discardableResult
-    private func ensureAuthorized() async -> Bool {
-        guard HKHealthStore.isHealthDataAvailable() else { return false }
-        if workoutSharingAuthorized() { return true }
-        debugLog.log("HK", "Authorization not granted — re-requesting before workout operation")
-        return await withCheckedContinuation { continuation in
-            healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead) { [weak self] _, error in
-                Task { @MainActor in
-                    if let error {
-                        self?.debugLog.log("HK", "Re-auth error: \(error.localizedDescription)")
-                    }
-                    continuation.resume(returning: self?.workoutSharingAuthorized() ?? false)
-                }
-            }
-        }
-    }
-
-    /// Start an outdoor cycling workout.
-    func startWorkout() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
-
-        // Prevent double-start: discard any abandoned builder first
-        if workoutBuilder != nil {
-            debugLog.log("HK", "WARN: startWorkout called with active builder — discarding previous")
-            discardWorkout()
-        }
+        let rideSamples = (ride.samples ?? []).sorted { $0.timestamp < $1.timestamp }
+        let startDate = ride.startDate
+        let endDate = max(ride.endDate ?? startDate.addingTimeInterval(TimeInterval(ride.duration)), startDate)
+        let title = ride.name.isEmpty ? "Giant Buddy" : ride.name
 
         let config = HKWorkoutConfiguration()
         config.activityType = .cycling
         config.locationType = .outdoor
-
         let builder = HKWorkoutBuilder(healthStore: healthStore, configuration: config, device: .local())
-        self.workoutBuilder = builder
-        self.routeBuilder = HKWorkoutRouteBuilder(healthStore: healthStore, device: .local())
-        let now = Date()
-        self.workoutStartDate = now
 
-        debugLog.log("HK", "Starting outdoor cycling workout...")
+        let samples = quantitySamples(for: ride, rideSamples: rideSamples, start: startDate, end: endDate)
+        let seconds = Int(endDate.timeIntervalSince(startDate))
+        debugLog.log("HK", "Saving workout \"\(title)\": \(samples.count) samples, \(seconds)s")
 
-        // Warm up / re-acquire the authorization assertion early so the save at
-        // stop time is far less likely to hit a dropped iOS-beta assertion.
-        Task { @MainActor [weak self] in await self?.ensureAuthorized() }
-
-        builder.beginCollection(withStart: now) { [weak self] success, error in
-            Task { @MainActor in
-                if let error {
-                    self?.debugLog.log("HK", "Begin collection FAILED: \(error.localizedDescription)")
-                } else {
-                    self?.debugLog.log("HK", "Workout collection started: \(success)")
-                }
-                // Set brand metadata so Apple Health shows "Giant Buddy"
-                do {
-                    try await builder.addMetadata(
-                        [HKMetadataKeyWorkoutBrandName: "Giant Buddy"]
-                    )
-                    self?.debugLog.log("HK", "Brand metadata set: Giant Buddy")
-                } catch {
-                    self?.debugLog.log("HK", "Brand metadata error: \(error.localizedDescription)")
-                }
+        do {
+            try await builder.beginCollection(at: startDate)
+            try await builder.addMetadata([
+                HKMetadataKeyWorkoutBrandName: title,
+                HKMetadataKeySyncIdentifier: ride.id.uuidString,
+                HKMetadataKeySyncVersion: 1
+            ])
+            if !samples.isEmpty {
+                try await builder.addSamples(samples)
             }
+            try await builder.endCollection(at: endDate)
+        } catch {
+            builder.discardWorkout()
+            throw error
         }
+
+        guard let workout = try await builder.finishWorkout() else {
+            throw WorkoutSaveError.finishReturnedNil
+        }
+        debugLog.log("HK", "Workout saved ✅ duration=\(Int(workout.duration))s")
+
+        await saveRoute(from: rideSamples, for: workout)
     }
 
-    /// Discard the current workout without saving to HealthKit.
-    func discardWorkout() {
-        guard let builder = workoutBuilder else { return }
-        let endDate = Date()
-        workoutBuilder = nil
-        routeBuilder = nil
-        workoutStartDate = nil
-        debugLog.log("HK", "Discarding workout (ride was discarded)")
-        builder.endCollection(withEnd: endDate) { [weak self] _, _ in
-            builder.finishWorkout { [weak self] _, _ in
-                // Builder discarded — HealthKit may still save a minimal
-                // entry; we delete it immediately.
-                Task { @MainActor in
-                    self?.debugLog.log("HK", "Discarded workout builder cleaned up")
-                }
-            }
-        }
-    }
-
-    /// Add a GPS location to the workout route.
-    func addRouteLocation(_ location: CLLocation) {
-        routeBuilder?.insertRouteData([location]) { [weak self] _, error in
-            if let error {
-                Task { @MainActor in
-                    self?.debugLog.log("HK", "Route insert error: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-
-    // swiftlint:disable function_body_length cyclomatic_complexity
-    /// Stop the workout and save it with ride summary data.
-    /// Chains: ensure auth + set title → add samples → endCollection → finishWorkout → finishRoute.
-    /// - Parameters:
-    ///   - title: Workout title shown in Apple Fitness (route name, or geocoded ride name).
-    ///   - distance: Total ride distance in km.
-    ///   - elevationGain: Total elevation gain in meters.
-    ///   - avgMotorPower: Average motor power output in watts.
-    ///   - avgRiderPower: Average human pedalling power in watts (torque × cadence × 2π/60).
-    ///   - duration: Ride duration in seconds.
-    ///   - heartRateSamples: Per-sample HR readings relayed from Apple Watch.
-    func stopWorkout(title: String? = nil,
-                     distance: Double, elevationGain: Double,
-                     avgMotorPower: Double, avgRiderPower: Double,
-                     duration: TimeInterval,
-                     heartRateSamples: [(timestamp: Date, bpm: Double)] = []) {
-        guard let builder = workoutBuilder else {
-            debugLog.log("HK", "stopWorkout called but no active builder")
-            return
-        }
-        let endDate = Date()
-        let startDate = workoutStartDate ?? endDate.addingTimeInterval(-duration)
-        let capturedRouteBuilder = routeBuilder
-        let backgroundTask = BackgroundTaskHandle(name: "save-workout", debugLog: debugLog)
-
-        // Clear references immediately
-        workoutBuilder = nil
-        routeBuilder = nil
-        workoutStartDate = nil
-
-        debugLog.log("HK", "Stopping workout: dist=\(String(format: "%.2f", distance))km motorW=\(String(format: "%.0f", avgMotorPower)) riderW=\(String(format: "%.0f", avgRiderPower)) dur=\(Int(duration))s")
-
-        // Build samples to add
+    private func quantitySamples(for ride: Ride, rideSamples: [RideSample],
+                                 start: Date, end: Date) -> [HKSample] {
         var samples: [HKSample] = []
 
-        // Distance (in meters — HealthKit distanceCycling expects meters)
-        if distance > 0, let distType = HKQuantityType.quantityType(forIdentifier: .distanceCycling) {
-            let distanceMeters = distance * 1000.0
-            let sample = HKQuantitySample(
+        // Distance (HealthKit distanceCycling in meters; ride distance is km)
+        if ride.totalDistance > 0, let distType = HKQuantityType.quantityType(forIdentifier: .distanceCycling) {
+            samples.append(HKQuantitySample(
                 type: distType,
-                quantity: HKQuantity(unit: .meter(), doubleValue: distanceMeters),
-                start: startDate, end: endDate
-            )
-            samples.append(sample)
-            debugLog.log("HK", "Distance sample: \(String(format: "%.0f", distanceMeters))m (\(String(format: "%.2f", distance))km)")
+                quantity: HKQuantity(unit: .meter(), doubleValue: ride.totalDistance * 1000.0),
+                start: start, end: end
+            ))
         }
 
-        // Calories — prefer rider power (human effort), fall back to motor power
-        let powerForCalories = avgRiderPower > 0 ? avgRiderPower : avgMotorPower
-        if powerForCalories > 0, let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
-            // power (W) × duration (s) = energy (J); 1 kcal = 4184 J
-            // Cycling efficiency ~25%, so total metabolic cost ≈ mechanical work / 0.25
-            let mechanicalWork = powerForCalories * duration
-            let metabolicEnergy = mechanicalWork / 0.25
-            let kcal = metabolicEnergy / 4184.0
-            let sample = HKQuantitySample(
+        // Calories — prefer rider power (human effort), fall back to motor power.
+        // power (W) × duration (s) = mechanical work (J); cycling efficiency ~25%,
+        // so metabolic cost ≈ work / 0.25; 1 kcal = 4184 J.
+        let riderPower = ride.avgRiderPower
+        let power = riderPower > 0 ? riderPower : ride.avgPower
+        let duration = end.timeIntervalSince(start)
+        if power > 0, duration > 0, let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+            let kcal = power * duration / 0.25 / 4184.0
+            samples.append(HKQuantitySample(
                 type: energyType,
                 quantity: HKQuantity(unit: .kilocalorie(), doubleValue: kcal),
-                start: startDate, end: endDate
-            )
-            samples.append(sample)
-            debugLog.log("HK", "Energy sample: \(String(format: "%.0f", kcal))kcal from \(String(format: "%.0f", powerForCalories))W × \(Int(duration))s")
+                start: start, end: end
+            ))
+            let kcalText = String(format: "%.0f", kcal)
+            let powerText = String(format: "%.0f", power)
+            debugLog.log("HK", "Energy: \(kcalText)kcal from \(powerText)W × \(Int(duration))s")
         }
 
-        // Add individual heart rate samples
+        // Heart rate relayed from Apple Watch during the ride
         if let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) {
             let bpmUnit = HKUnit.count().unitDivided(by: .minute())
-            for hr in heartRateSamples where hr.bpm > 0 {
-                let sample = HKQuantitySample(
+            for sample in rideSamples where sample.heartRate > 0 {
+                samples.append(HKQuantitySample(
                     type: hrType,
-                    quantity: HKQuantity(unit: bpmUnit, doubleValue: hr.bpm),
-                    start: hr.timestamp, end: hr.timestamp.addingTimeInterval(2)
-                )
-                samples.append(sample)
-            }
-            if !heartRateSamples.isEmpty {
-                debugLog.log("HK", "Including \(heartRateSamples.filter { $0.bpm > 0 }.count) HR samples")
+                    quantity: HKQuantity(unit: bpmUnit, doubleValue: sample.heartRate),
+                    start: sample.timestamp, end: sample.timestamp
+                ))
             }
         }
 
-        // Step 1: Add all samples at once
-        let addSamples: (@escaping @Sendable () -> Void) -> Void = { completion in
-            guard !samples.isEmpty else { completion(); return }
-            let sampleCount = samples.count
-            builder.add(samples) { [weak self] _, error in
-                Task { @MainActor in
-                    if let error {
-                        self?.debugLog.log("HK", "Add samples FAILED: \(error.localizedDescription)")
-                    } else {
-                        self?.debugLog.log("HK", "Added \(sampleCount) samples")
-                    }
-                    completion()
-                }
-            }
-        }
-
-        // Step 2: End collection (after samples added)
-        let endCollection: @Sendable (@escaping @Sendable () -> Void) -> Void = { completion in
-            builder.endCollection(withEnd: endDate) { [weak self] success, error in
-                Task { @MainActor in
-                    if let error {
-                        self?.debugLog.log("HK", "End collection FAILED: \(error.localizedDescription)")
-                    } else {
-                        self?.debugLog.log("HK", "Collection ended: \(success)")
-                    }
-                    completion()
-                }
-            }
-        }
-
-        // Step 3: Finish workout (after collection ended)
-        let finishWorkout: @Sendable () -> Void = { [weak self] in
-            builder.finishWorkout { [weak self] workout, error in
-                Task { @MainActor in
-                    if let error {
-                        self?.debugLog.log("HK", "Finish workout FAILED: \(error.localizedDescription)")
-                        backgroundTask.end()
-                        return
-                    }
-                    guard let workout else {
-                        self?.debugLog.log("HK", "Finish workout returned nil")
-                        backgroundTask.end()
-                        return
-                    }
-                    self?.debugLog.log("HK", "Workout saved ✅ duration=\(Int(workout.duration))s")
-
-                    // Step 4: Attach GPS route
-                    guard let capturedRouteBuilder else {
-                        backgroundTask.end()
-                        return
-                    }
-
-                    do {
-                        try await capturedRouteBuilder.finishRoute(with: workout, metadata: nil)
-                        self?.debugLog.log("HK", "Route saved ✅")
-                    } catch {
-                        self?.debugLog.log("HK", "Route save error: \(error.localizedDescription)")
-                    }
-                    backgroundTask.end()
-                }
-            }
-        }
-
-        // Chain: (ensure auth + set title) → addSamples → endCollection → finishWorkout.
-        // iOS beta intermittently drops the HealthKit authorization assertion,
-        // causing "Authorization is not determined" and a nil finishWorkout, so we
-        // re-acquire it here before saving. The title (route/ride name) is written
-        // as brand metadata, which the Fitness app shows as the workout title.
-        Task { @MainActor in
-            let authed = await self.ensureAuthorized()
-            if !authed {
-                self.debugLog.log("HK", "WARN: HealthKit not authorized at save — attempting save anyway")
-            }
-            if let title, !title.isEmpty {
-                do {
-                    try await builder.addMetadata([HKMetadataKeyWorkoutBrandName: title])
-                    self.debugLog.log("HK", "Workout title set: \(title)")
-                } catch {
-                    self.debugLog.log("HK", "Title metadata error: \(error.localizedDescription)")
-                }
-            }
-            addSamples {
-                endCollection {
-                    finishWorkout()
-                }
-            }
-        }
+        return samples
     }
-    // swiftlint:enable function_body_length cyclomatic_complexity
 
-    /// Inject a sample 10-minute cycling workout for debugging.
-    func injectSampleWorkout() {
-        guard HKHealthStore.isHealthDataAvailable() else {
-            debugLog.log("HK", "HealthKit not available")
-            return
-        }
-
-        debugLog.log("HK", "Injecting sample workout...")
-
-        let config = HKWorkoutConfiguration()
-        config.activityType = .cycling
-        config.locationType = .outdoor
-
-        let builder = HKWorkoutBuilder(healthStore: healthStore, configuration: config, device: .local())
-        let endDate = Date()
-        let startDate = endDate.addingTimeInterval(-600) // 10 minutes ago
-
-        builder.beginCollection(withStart: startDate) { [weak self] _, error in
-            if let error {
-                Task { @MainActor in
-                    self?.debugLog.log("HK", "Sample begin FAILED: \(error.localizedDescription)")
-                }
-                return
+    /// Attach the GPS route. A failure here is logged but not thrown: the workout
+    /// is already saved and the route cannot be re-attached on retry.
+    private func saveRoute(from rideSamples: [RideSample], for workout: HKWorkout) async {
+        let locations = rideSamples
+            .filter { ($0.latitude != 0 || $0.longitude != 0) && $0.horizontalAccuracy >= 0 }
+            .map { sample in
+                CLLocation(
+                    coordinate: CLLocationCoordinate2D(latitude: sample.latitude, longitude: sample.longitude),
+                    altitude: sample.altitude,
+                    horizontalAccuracy: sample.horizontalAccuracy,
+                    // Vertical accuracy isn't stored; reuse horizontal so altitude counts as valid.
+                    verticalAccuracy: sample.altitude != 0 ? sample.horizontalAccuracy : -1,
+                    course: sample.course,
+                    speed: sample.gpsSpeed,
+                    timestamp: sample.timestamp
+                )
             }
+        guard !locations.isEmpty else { return }
 
-            // Build samples
-            var samples: [HKSample] = []
-            if let distType = HKQuantityType.quantityType(forIdentifier: .distanceCycling) {
-                samples.append(HKQuantitySample(
-                    type: distType,
-                    quantity: HKQuantity(unit: .meterUnit(with: .kilo), doubleValue: 5.0),
-                    start: startDate, end: endDate
-                ))
-            }
-            if let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
-                samples.append(HKQuantitySample(
-                    type: energyType,
-                    quantity: HKQuantity(unit: .kilocalorie(), doubleValue: 120.0),
-                    start: startDate, end: endDate
-                ))
-            }
-
-            builder.add(samples) { [weak self] _, error in
-                if let error {
-                    Task { @MainActor in
-                        self?.debugLog.log("HK", "Sample add FAILED: \(error.localizedDescription)")
-                    }
-                    return
-                }
-
-                Task { @MainActor in
-                    self?.debugLog.log("HK", "Sample: added distance + energy")
-                }
-
-                builder.endCollection(withEnd: endDate) { [weak self] _, error in
-                    if let error {
-                        Task { @MainActor in
-                            self?.debugLog.log("HK", "Sample end FAILED: \(error.localizedDescription)")
-                        }
-                        return
-                    }
-
-                    builder.finishWorkout { [weak self] workout, error in
-                        Task { @MainActor in
-                            if let error {
-                                self?.debugLog.log("HK", "Sample finish FAILED: \(error.localizedDescription)")
-                            } else {
-                                self?.debugLog.log("HK", "Sample workout saved ✅ \(workout?.duration ?? 0)s")
-                            }
-                        }
-                    }
-                }
-            }
+        let routeBuilder = HKWorkoutRouteBuilder(healthStore: healthStore, device: .local())
+        do {
+            try await routeBuilder.insertRouteData(locations)
+            _ = try await routeBuilder.finishRoute(with: workout, metadata: nil)
+            debugLog.log("HK", "Route saved ✅ \(locations.count) points")
+        } catch {
+            debugLog.log("HK", "Route save error: \(error.localizedDescription)")
         }
     }
 }

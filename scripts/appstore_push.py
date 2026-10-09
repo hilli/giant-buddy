@@ -18,6 +18,7 @@ Usage:
   uv run scripts/appstore_push.py --dry-run
   uv run scripts/appstore_push.py
   uv run scripts/appstore_push.py --skip-screenshots --add-to-draft [--build 3]
+  uv run scripts/appstore_push.py --skip-screenshots --attach recording.mp4
 
 --add-to-draft attaches a valid build to the version and puts it in a draft
 review submission. It never submits; press "Submit for Review" in App Store
@@ -262,10 +263,10 @@ def push_version_localization(api: ASC, version_id: str, meta: dict[str, str]) -
     return created["id"] if created else None
 
 
-def push_review_details(api: ASC, version_id: str, meta: dict[str, str], contact: dict[str, str] | None) -> None:
+def push_review_details(api: ASC, version_id: str, meta: dict[str, str], contact: dict[str, str] | None) -> str | None:
     if contact is None:
         print(f"  review details: skipped ({REVIEW_CONTACT.name} not found)")
-        return
+        return None
     attributes = {**contact, "notes": meta["review_notes"] or None, "demoAccountRequired": False}
     try:
         existing = api.get(f"/v1/appStoreVersions/{version_id}/appStoreReviewDetail").get("data")
@@ -276,36 +277,60 @@ def push_review_details(api: ASC, version_id: str, meta: dict[str, str], contact
     print("  review details: contact + notes")
     if existing:
         api.update("appStoreReviewDetails", existing["id"], attributes)
-    else:
-        api.create("appStoreReviewDetails", attributes, {"appStoreVersion": rel("appStoreVersions", version_id)})
+        return existing["id"]
+    created = api.create("appStoreReviewDetails", attributes, {"appStoreVersion": rel("appStoreVersions", version_id)})
+    return created["id"] if created else None
 
 
-def upload_screenshot(api: ASC, set_id: str, path: Path) -> None:
+def upload_asset(api: ASC, type_: str, relationships: dict, path: Path) -> str | None:
+    """Reserve, upload and commit a file asset (screenshot or review attachment)."""
     data = path.read_bytes()
-    created = api.create(
-        "appScreenshots",
-        {"fileName": path.name, "fileSize": len(data)},
-        {"appScreenshotSet": rel("appScreenshotSets", set_id)},
-    )
+    created = api.create(type_, {"fileName": path.name, "fileSize": len(data)}, relationships)
     if created is None:
-        return
+        return None
     for op in created["attributes"]["uploadOperations"]:
         chunk = data[op["offset"] : op["offset"] + op["length"]]
         headers = {h["name"]: h["value"] for h in op.get("requestHeaders") or []}
         resp = requests.request(op["method"], op["url"], data=chunk, headers=headers, timeout=120)
         if resp.status_code >= 400:
             raise ASCError(f"Upload of {path.name} failed: {resp.status_code} {resp.text}", resp.status_code)
-    api.update("appScreenshots", created["id"], {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()})
+    api.update(type_, created["id"], {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()})
+    return created["id"]
 
+
+def wait_for_delivery(api: ASC, type_: str, id_: str, name: str) -> None:
     for _ in range(30):
-        attrs = api.get(f"/v1/appScreenshots/{created['id']}")["data"]["attributes"]
+        attrs = api.get(f"/v1/{type_}/{id_}")["data"]["attributes"]
         delivery = attrs.get("assetDeliveryState") or {}
         if delivery.get("state") == "COMPLETE":
             return
         if delivery.get("state") == "FAILED":
-            raise ASCError(f"{path.name} processing failed: {delivery.get('errors')}")
+            raise ASCError(f"{name} processing failed: {delivery.get('errors')}")
         time.sleep(2)
-    print(f"    {path.name}: still processing, check App Store Connect")
+    print(f"    {name}: still processing, check App Store Connect")
+
+
+def upload_screenshot(api: ASC, set_id: str, path: Path) -> None:
+    created_id = upload_asset(api, "appScreenshots", {"appScreenshotSet": rel("appScreenshotSets", set_id)}, path)
+    if created_id:
+        wait_for_delivery(api, "appScreenshots", created_id, path.name)
+
+
+def push_review_attachment(api: ASC, detail_id: str, path: Path) -> None:
+    """Upload the App Review attachment. App Store Connect allows only one, so any other is replaced."""
+    existing = api.get(f"/v1/appStoreReviewDetails/{detail_id}/appStoreReviewAttachments")["data"]
+    checksum = hashlib.md5(path.read_bytes()).hexdigest()
+    attrs = [a["attributes"] for a in existing]
+    if any(a.get("fileName") == path.name and a.get("sourceFileChecksum") == checksum for a in attrs):
+        print(f"  review attachment: {path.name} unchanged")
+        return
+    for old in existing:
+        api.request("DELETE", f"/v1/appStoreReviewAttachments/{old['id']}")
+    print(f"  review attachment: {path.name} ({path.stat().st_size / 1e6:.1f} MB)")
+    relationships = {"appStoreReviewDetail": rel("appStoreReviewDetails", detail_id)}
+    created_id = upload_asset(api, "appStoreReviewAttachments", relationships, path)
+    if created_id:
+        wait_for_delivery(api, "appStoreReviewAttachments", created_id, path.name)
 
 
 def push_screenshot_set(api: ASC, localization_id: str, sets: list[dict], folder: str, display_type: str) -> None:
@@ -415,10 +440,18 @@ def main() -> None:
         help="attach a build and add the version to a draft review submission (never submits)",
     )
     parser.add_argument("--build", help="build number to attach with --add-to-draft (default: keep or latest valid)")
+    parser.add_argument(
+        "--attach",
+        type=Path,
+        metavar="FILE",
+        help="upload FILE as the App Review attachment, e.g. a screen recording (only one is allowed)",
+    )
     args = parser.parse_args()
 
     meta = load_metadata()
     contact = load_review_contact()
+    if args.attach and not args.attach.is_file():
+        raise SystemExit(f"--attach file not found: {args.attach}")
     print("Local metadata OK")
 
     env = {key: os.environ.get(key, "") for key in ("ASC_ISSUER_ID", "ASC_KEY_ID", "ASC_KEY_PATH")}
@@ -440,7 +473,12 @@ def main() -> None:
             print("Dry run: version doesn't exist yet, skipping version-level changes")
             return
         localization_id = push_version_localization(api, version_id, meta)
-        push_review_details(api, version_id, meta, contact)
+        detail_id = push_review_details(api, version_id, meta, contact)
+        if args.attach:
+            if detail_id:
+                push_review_attachment(api, detail_id, args.attach)
+            else:
+                print("  review attachments: skipped (no App Review details)")
         if localization_id and not args.skip_screenshots:
             push_screenshots(api, localization_id)
         if args.add_to_draft and attach_build(api, app["id"], version_id, args.version, args.build):

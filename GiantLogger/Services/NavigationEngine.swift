@@ -84,6 +84,7 @@ class NavigationEngine: ObservableObject {
     private var destinationCoordinate: CLLocationCoordinate2D?
     private var lastUpdateLocation: CLLocation?
     private var routeCoordinates: [CLLocationCoordinate2D] = []
+    private var progress = RouteProgress()
     private let watchConnectivity = WatchConnectivityManager.shared
     private var isDestinationNavigation = false
 
@@ -120,8 +121,12 @@ class NavigationEngine: ObservableObject {
     /// Routes between key navigation waypoints only, avoiding excessive API calls
     /// for routes with many interpolated polyline coordinates.
     /// When `userLocation` is provided, navigation starts from the closest key waypoint
-    /// with an initial leg from the user's position to that waypoint.
-    func calculateDirections(for route: Route, from userLocation: CLLocation? = nil) async {
+    /// (or `rejoinIndex`, when rerouting) with an initial leg from the user's position to that waypoint.
+    func calculateDirections(
+        for route: Route,
+        from userLocation: CLLocation? = nil,
+        rejoiningAt rejoinIndex: Int? = nil
+    ) async {
         let allWaypoints = route.sortedWaypoints
         guard allWaypoints.count >= 2 else { directionsAvailable = false; return }
         activeRoute = route
@@ -134,18 +139,11 @@ class NavigationEngine: ObservableObject {
 
         // Determine which key waypoint to start from based on user proximity
         let insertUserLeg: Bool
+        var startIndex = 0
         if let userLocation {
-            var closestIndex = 0
-            var closestDistance = Double.greatestFiniteMagnitude
-            for (idx, wp) in navWaypoints.enumerated() {
-                let dist = userLocation.distance(from: CLLocation(latitude: wp.latitude, longitude: wp.longitude))
-                if dist < closestDistance {
-                    closestDistance = dist
-                    closestIndex = idx
-                }
-            }
+            let closestIndex = rejoinIndex ?? nearestWaypointIndex(to: userLocation, in: navWaypoints)
             // If closest is the last waypoint, step back one so there's at least one leg
-            let startIndex = min(closestIndex, navWaypoints.count - 2)
+            startIndex = min(closestIndex, navWaypoints.count - 2)
             navWaypoints = Array(navWaypoints[startIndex...])
             insertUserLeg = true
         } else {
@@ -154,6 +152,7 @@ class NavigationEngine: ObservableObject {
 
         var allSteps: [MKRoute.Step] = []
         var allCoordinates: [CLLocationCoordinate2D] = []
+        var legEnds: [RouteProgress.LegEnd] = []
         let lastLegIndex = navWaypoints.count - 2
 
         // First leg from user's current position to the closest key waypoint
@@ -175,6 +174,9 @@ class NavigationEngine: ObservableObject {
                 }
                 allSteps.append(contentsOf: steps)
                 allCoordinates.append(contentsOf: leg.polyline.coordinates)
+                if !allCoordinates.isEmpty {
+                    legEnds.append(.init(coordinateIndex: allCoordinates.count - 1, waypointIndex: startIndex))
+                }
             }
         }
 
@@ -232,19 +234,16 @@ class NavigationEngine: ObservableObject {
                     }
                 }
             }
+            if !allCoordinates.isEmpty {
+                legEnds.append(.init(coordinateIndex: allCoordinates.count - 1, waypointIndex: startIndex + i + 1))
+            }
             if i < lastLegIndex {
                 try? await Task.sleep(for: .milliseconds(150))
             }
         }
 
-        routeSteps = allSteps
-        routeCoordinates = allCoordinates
+        setRoute(steps: allSteps, coordinates: allCoordinates, legEnds: legEnds)
         directionsAvailable = !allSteps.isEmpty
-        currentStepIndex = 0
-        lastAnnouncedStepIndex = -1
-        lastAnnouncedDistance = .none
-        lastHapticStepIndex = -1
-        clearOffRouteState()
 
         if directionsAvailable {
             updateInstructions()
@@ -254,18 +253,31 @@ class NavigationEngine: ObservableObject {
 
     private func applyRoute(_ route: MKRoute) {
         mkRoute = route
-        routeSteps = route.steps.filter { !$0.instructions.isEmpty }
-        routeCoordinates = route.polyline.coordinates
+        setRoute(steps: route.steps.filter { !$0.instructions.isEmpty }, coordinates: route.polyline.coordinates)
+        directionsAvailable = true
+        updateInstructions()
+        configureAudioSession()
+    }
+
+    private func setRoute(
+        steps: [MKRoute.Step],
+        coordinates: [CLLocationCoordinate2D],
+        legEnds: [RouteProgress.LegEnd] = []
+    ) {
+        routeSteps = steps
+        routeCoordinates = coordinates
+        progress = RouteProgress(
+            coordinates: coordinates,
+            stepEnds: steps.map { stepEndCoordinate(for: $0) },
+            legEnds: legEnds
+        )
         currentStepIndex = 0
         lastAnnouncedStepIndex = -1
         lastAnnouncedDistance = .none
         lastHapticStepIndex = -1
         clearOffRouteState()
-        directionsAvailable = true
-        totalRouteDistance = route.distance
-        remainingDistance = route.distance
-        updateInstructions()
-        configureAudioSession()
+        totalRouteDistance = progress.totalDistance
+        refreshProgressState()
     }
 
     private enum NavigationError: LocalizedError {
@@ -287,6 +299,13 @@ class NavigationEngine: ObservableObject {
             print("NavigationEngine: \(label) returned no cycling route; ignoring non-cycling alternatives")
         }
         return nil
+    }
+
+    private func nearestWaypointIndex(to location: CLLocation, in waypoints: [RouteWaypoint]) -> Int {
+        let distances = waypoints.map {
+            location.distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude))
+        }
+        return distances.indices.min { distances[$0] < distances[$1] } ?? 0
     }
 
     private func clearOffRouteState() {
@@ -313,28 +332,15 @@ class NavigationEngine: ObservableObject {
             return
         }
 
-        // Advance current step based on proximity
-        advanceStepIfNeeded(location: location)
-
-        // Update distance to next maneuver
-        if currentStepIndex < routeSteps.count {
-            let step = routeSteps[currentStepIndex]
-            let stepEndCoord = stepEndCoordinate(for: step)
-            distanceToNextManeuver = location.distance(
-                from: CLLocation(latitude: stepEndCoord.latitude, longitude: stepEndCoord.longitude)
-            )
-            // Remaining = distance to next maneuver + all subsequent steps
-            var remaining = distanceToNextManeuver
-            for i in (currentStepIndex + 1)..<routeSteps.count {
-                remaining += routeSteps[i].distance
-            }
-            remainingDistance = remaining
-        }
+        let match = progress.update(with: location.coordinate, threshold: offRouteThreshold)
+        refreshProgressState()
 
         updateInstructions()
 
         // Off-route / reroute detection
-        handleOffRouteDetection(location: location)
+        if let match {
+            handleOffRouteDetection(match: match, location: location)
+        }
 
         guard !isOffRoute, !isRerouting else { return }
 
@@ -345,22 +351,16 @@ class NavigationEngine: ObservableObject {
         handleHapticFeedback()
     }
 
-    private func advanceStepIfNeeded(location: CLLocation) {
-        // If we're close to the end of the current step, advance
-        while currentStepIndex < routeSteps.count - 1 {
-            let step = routeSteps[currentStepIndex]
-            let stepEnd = stepEndCoordinate(for: step)
-            let distToEnd = location.distance(
-                from: CLLocation(latitude: stepEnd.latitude, longitude: stepEnd.longitude)
-            )
-            // If within 20m of step endpoint, advance
-            if distToEnd < 20 {
-                currentStepIndex += 1
-                lastAnnouncedDistance = .none
-            } else {
-                break
-            }
+    /// Syncs the current step and distances, measured along the route, with `progress`.
+    private func refreshProgressState() {
+        guard !routeSteps.isEmpty else { return }
+        let stepIndex = progress.currentStepIndex
+        if stepIndex != currentStepIndex {
+            currentStepIndex = stepIndex
+            lastAnnouncedDistance = .none
         }
+        distanceToNextManeuver = progress.distanceToStepEnd(at: currentStepIndex)
+        remainingDistance = progress.remainingDistance
     }
 
     private func stepEndCoordinate(for step: MKRoute.Step) -> CLLocationCoordinate2D {
@@ -645,23 +645,13 @@ class NavigationEngine: ObservableObject {
 
     // MARK: - Re-routing
 
-    private func handleOffRouteDetection(location: CLLocation) {
-        guard !routeCoordinates.isEmpty else { return }
+    private func handleOffRouteDetection(match: RouteProgress.Match, location: CLLocation) {
         guard !isRerouting else { return }
 
-        let locationPoint = MKMapPoint(location.coordinate)
-        var minDist = Double.greatestFiniteMagnitude
-        for i in 0..<(routeCoordinates.count - 1) {
-            let start = MKMapPoint(routeCoordinates[i])
-            let end = MKMapPoint(routeCoordinates[i + 1])
-            let dist = distanceFromPointToSegment(point: locationPoint, segStart: start, segEnd: end)
-            minDist = min(minDist, dist)
-        }
+        offRouteDistance = match.distanceFromRoute
+        isOffRoute = !match.isOnRoute
 
-        offRouteDistance = minDist
-        isOffRoute = minDist > offRouteThreshold
-
-        if minDist > offRouteThreshold {
+        if isOffRoute {
             if offRouteStartTime == nil {
                 offRouteStartTime = Date()
             } else if let start = offRouteStartTime,
@@ -677,49 +667,16 @@ class NavigationEngine: ObservableObject {
         }
     }
 
-    private func distanceToPolyline(point: MKMapPoint, polyline: MKPolyline) -> Double {
-        let count = polyline.pointCount
-        guard count >= 2 else {
-            return point.distance(to: MKMapPoint(polyline.coordinate))
-        }
-
-        var coords = [CLLocationCoordinate2D](repeating: CLLocationCoordinate2D(), count: count)
-        polyline.getCoordinates(&coords, range: NSRange(location: 0, length: count))
-
-        var minDist = Double.greatestFiniteMagnitude
-        for i in 0..<(count - 1) {
-            let start = MKMapPoint(coords[i])
-            let end = MKMapPoint(coords[i + 1])
-            let dist = distanceFromPointToSegment(point: point, segStart: start, segEnd: end)
-            minDist = min(minDist, dist)
-        }
-        return minDist
-    }
-
-    private func distanceFromPointToSegment(point: MKMapPoint, segStart: MKMapPoint, segEnd: MKMapPoint) -> Double {
-        let dx = segEnd.x - segStart.x
-        let dy = segEnd.y - segStart.y
-        let lengthSq = dx * dx + dy * dy
-
-        if lengthSq == 0 {
-            return point.distance(to: segStart)
-        }
-
-        let t = max(0, min(1,
-            ((point.x - segStart.x) * dx + (point.y - segStart.y) * dy) / lengthSq
-        ))
-
-        let projected = MKMapPoint(x: segStart.x + t * dx, y: segStart.y + t * dy)
-        return point.distance(to: projected)
-    }
-
     /// Recalculate directions from current location to the destination.
+    /// A→B navigation routes straight to the destination; planned routes rejoin at the
+    /// next waypoint the rider has not reached yet.
     func reroute(from location: CLLocation, to destination: CLLocationCoordinate2D) async {
         isRerouting = true
         rerouteFailed = false
 
-        if let activeRoute {
-            await calculateDirections(for: activeRoute, from: location)
+        if !isDestinationNavigation, let activeRoute, let rejoinIndex = progress.nextWaypointIndex,
+           rejoinIndex < activeRoute.navigationWaypoints.count - 1 {
+            await calculateDirections(for: activeRoute, from: location, rejoiningAt: rejoinIndex)
             if directionsAvailable {
                 isRerouting = false
                 return
@@ -829,6 +786,7 @@ class NavigationEngine: ObservableObject {
         activeRoute = nil
         routeSteps = []
         routeCoordinates = []
+        progress = RouteProgress()
         currentInstruction = nil
         nextInstruction = nil
         hasArrived = false
