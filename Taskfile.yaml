@@ -87,10 +87,10 @@ tasks:
         xcrun simctl launch booted {{.BUNDLE_ID}}
 
   appstore:screenshots:
-    desc: Capture App Store screenshots in the Simulator using demo data (ScreenshotMode)
+    desc: Capture raw demo-mode screenshots in the Simulator (ScreenshotMode); not uploaded
     vars:
       SIM_NAME: '{{.SIM_NAME | default "iPhone 17 Pro Max"}}'
-      OUT_DIR: docs/appstore/screenshots/iphone
+      OUT_DIR: docs/appstore/screenshots/simulator
     cmds:
       - |
         set -euo pipefail
@@ -118,6 +118,14 @@ tasks:
         done
         xcrun simctl terminate "$UDID" {{.BUNDLE_ID}} 2>/dev/null || true
         xcrun simctl status_bar "$UDID" clear
+
+  appstore:frames:
+    desc: Render captioned iPhone App Store screenshots from docs/appstore/screenshots/source
+    preconditions:
+      - sh: command -v uv
+        msg: "uv not found. Install with: brew install uv (or mise use uv)"
+    cmds:
+      - uv run scripts/appstore_frames.py
 
   appstore:push:
     desc: Push App Store metadata + screenshots via App Store Connect API (pass -- --dry-run to preview)
