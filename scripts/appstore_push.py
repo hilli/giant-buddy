@@ -18,7 +18,7 @@ Usage:
   uv run scripts/appstore_push.py --dry-run
   uv run scripts/appstore_push.py
   uv run scripts/appstore_push.py --skip-screenshots --add-to-draft [--build 3]
-  uv run scripts/appstore_push.py --skip-screenshots --attach recording.mp4 --attach ride.gpx
+  uv run scripts/appstore_push.py --skip-screenshots --attach recording.mp4
 
 --add-to-draft attaches a valid build to the version and puts it in a draft
 review submission. It never submits; press "Submit for Review" in App Store
@@ -316,22 +316,21 @@ def upload_screenshot(api: ASC, set_id: str, path: Path) -> None:
         wait_for_delivery(api, "appScreenshots", created_id, path.name)
 
 
-def push_review_attachments(api: ASC, detail_id: str, paths: list[Path]) -> None:
-    """Upload files for App Review, replacing an existing attachment with the same name."""
+def push_review_attachment(api: ASC, detail_id: str, path: Path) -> None:
+    """Upload the App Review attachment. App Store Connect allows only one, so any other is replaced."""
     existing = api.get(f"/v1/appStoreReviewDetails/{detail_id}/appStoreReviewAttachments")["data"]
-    for path in paths:
-        checksum = hashlib.md5(path.read_bytes()).hexdigest()
-        same_name = [a for a in existing if a["attributes"].get("fileName") == path.name]
-        if any(a["attributes"].get("sourceFileChecksum") == checksum for a in same_name):
-            print(f"  review attachment: {path.name} unchanged")
-            continue
-        for old in same_name:
-            api.request("DELETE", f"/v1/appStoreReviewAttachments/{old['id']}")
-        print(f"  review attachment: {path.name} ({path.stat().st_size / 1e6:.1f} MB)")
-        relationships = {"appStoreReviewDetail": rel("appStoreReviewDetails", detail_id)}
-        created_id = upload_asset(api, "appStoreReviewAttachments", relationships, path)
-        if created_id:
-            wait_for_delivery(api, "appStoreReviewAttachments", created_id, path.name)
+    checksum = hashlib.md5(path.read_bytes()).hexdigest()
+    attrs = [a["attributes"] for a in existing]
+    if any(a.get("fileName") == path.name and a.get("sourceFileChecksum") == checksum for a in attrs):
+        print(f"  review attachment: {path.name} unchanged")
+        return
+    for old in existing:
+        api.request("DELETE", f"/v1/appStoreReviewAttachments/{old['id']}")
+    print(f"  review attachment: {path.name} ({path.stat().st_size / 1e6:.1f} MB)")
+    relationships = {"appStoreReviewDetail": rel("appStoreReviewDetails", detail_id)}
+    created_id = upload_asset(api, "appStoreReviewAttachments", relationships, path)
+    if created_id:
+        wait_for_delivery(api, "appStoreReviewAttachments", created_id, path.name)
 
 
 def push_screenshot_set(api: ASC, localization_id: str, sets: list[dict], folder: str, display_type: str) -> None:
@@ -443,19 +442,16 @@ def main() -> None:
     parser.add_argument("--build", help="build number to attach with --add-to-draft (default: keep or latest valid)")
     parser.add_argument(
         "--attach",
-        action="append",
-        default=[],
         type=Path,
         metavar="FILE",
-        help="upload FILE as an App Review attachment, e.g. a screen recording (repeatable)",
+        help="upload FILE as the App Review attachment, e.g. a screen recording (only one is allowed)",
     )
     args = parser.parse_args()
 
     meta = load_metadata()
     contact = load_review_contact()
-    missing_files = [str(path) for path in args.attach if not path.is_file()]
-    if missing_files:
-        raise SystemExit(f"--attach file not found: {', '.join(missing_files)}")
+    if args.attach and not args.attach.is_file():
+        raise SystemExit(f"--attach file not found: {args.attach}")
     print("Local metadata OK")
 
     env = {key: os.environ.get(key, "") for key in ("ASC_ISSUER_ID", "ASC_KEY_ID", "ASC_KEY_PATH")}
@@ -480,7 +476,7 @@ def main() -> None:
         detail_id = push_review_details(api, version_id, meta, contact)
         if args.attach:
             if detail_id:
-                push_review_attachments(api, detail_id, args.attach)
+                push_review_attachment(api, detail_id, args.attach)
             else:
                 print("  review attachments: skipped (no App Review details)")
         if localization_id and not args.skip_screenshots:
